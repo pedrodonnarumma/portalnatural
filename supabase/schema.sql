@@ -276,6 +276,29 @@ alter table public.productos add column if not exists imagen_url text;
 alter table public.productos add column if not exists descripcion text;
 alter table public.productos add column if not exists destacado boolean not null default false;
 
+-- ───────────────────────── Venta por fracción ─────────────────────────
+-- `venta_por`: fracción de la unidad base a la que refiere el precio público
+-- y el paso del stepper en el carrito.
+-- Ejemplos: unidad='kg' venta_por=0.1  → precio es por 100 g, se vende de a 100 g.
+--           unidad='kg' venta_por=0.25 → precio es por 250 g.
+--           unidad='kg' venta_por=1    → precio es por kg.
+--           unidad='l'  venta_por=0.5  → precio es por 500 ml.
+--           unidad='un' venta_por=1    → precio es por unidad.
+--
+-- IMPORTANTE — migración previa si hay productos con unidad='g':
+-- Ejecutar ANTES de correr este schema si la tabla ya tiene datos con unidad='g':
+--
+--   UPDATE public.productos
+--   SET precio = precio * 1000,
+--       unidad = 'kg',
+--       venta_por = 0.1
+--   WHERE unidad = 'g';
+--
+-- Así "Nueces — $12 / g" pasa a "Nueces — $12.000 / kg, venta_por=0.1 → $1.200 / 100 g".
+-- Verificar los precios con: SELECT nombre, unidad, precio, venta_por FROM productos;
+
+alter table public.productos add column if not exists venta_por numeric(12,3) not null default 1 check (venta_por > 0);
+
 -- Lectura pública de productos activos para la landing (sin autenticación).
 do $$
 begin

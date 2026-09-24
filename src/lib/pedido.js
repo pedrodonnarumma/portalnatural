@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { fmtPrecio } from './format.js';
+import { etiquetaCantidad, etiquetaPresentacion, precioPresentacion } from './precios.js';
 import { site } from '../data/site.js';
 
 const KEY = 'pn-pedido';
@@ -7,13 +8,16 @@ const KEY = 'pn-pedido';
 function leer() {
   try {
     const v = JSON.parse(localStorage.getItem(KEY) || '{}');
-    return v && typeof v === 'object' ? v : {};
+    // Descarte silencioso si el formato es inválido (valores no numéricos = formato viejo roto).
+    if (v && typeof v === 'object' && Object.values(v).every((x) => typeof x === 'number')) return v;
+    return {};
   } catch {
     return {};
   }
 }
 
-// Pedido = { [nombre]: cantidad }. Se guarda en el navegador para no perderlo al recargar.
+// Pedido = { [nombre]: pasos }. Un "paso" es venta_por de la unidad base.
+// Se guarda en el navegador para no perderlo al recargar.
 export function usePedido() {
   const [qty, setQty] = useState(leer);
 
@@ -48,8 +52,17 @@ export function usePedido() {
   return { qty, sumar, quitar, vaciar };
 }
 
+// items: [{ nombre, unidad, venta_por, precio, pasos, subtotal }]
 export function mensajeWhatsApp(items, total) {
-  const lineas = items.map((it) => `• ${it.cantidad} × ${it.nombre} (${it.unidad}) — ${fmtPrecio(it.subtotal)}`);
+  const lineas = items.map((it) => {
+    const vp = it.venta_por ?? 1;
+    const cantLabel = etiquetaCantidad(it.pasos, it.unidad, vp);
+    const precLabel = `${fmtPrecio(precioPresentacion(it.precio, vp))} / ${etiquetaPresentacion(it.unidad, vp)}`;
+    if (it.unidad === 'un') {
+      return `• ${cantLabel} de ${it.nombre} — ${fmtPrecio(it.subtotal)}`;
+    }
+    return `• ${cantLabel} de ${it.nombre} — ${fmtPrecio(it.subtotal)} (${precLabel})`;
+  });
   return [
     '¡Hola, Portal Natural! Quiero hacer este pedido:',
     '',

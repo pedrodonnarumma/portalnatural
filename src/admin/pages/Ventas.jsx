@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2, Ban, Eye } from 'lucide-react';
 import { supabase } from '../../lib/supabase.js';
 import { fmtDate, fmtMoney, fmtQty, MEDIOS_PAGO, medioPagoLabel, startOfDayISO, toDateInput } from '../lib/format.js';
+import { etiquetaPresentacion, precioPresentacion } from '../../lib/precios.js';
 import { Confirm, EmptyState, ErrorBox, Field, Modal, PageHead, SearchBox, Spinner, useToast } from '../components/ui.jsx';
 
 const RANGOS = [
@@ -160,13 +161,19 @@ function NuevaVenta({ onClose, onSaved }) {
 
   useEffect(() => {
     Promise.all([
-      supabase.from('productos').select('id, nombre, categoria, unidad, precio, stock').eq('activo', true).order('nombre'),
+      supabase.from('productos').select('id, nombre, categoria, unidad, venta_por, precio, stock').eq('activo', true).order('nombre'),
       supabase.from('clientes').select('id, nombre').order('nombre'),
       supabase.from('precios_promo_vigentes').select('producto_id, precio_promo'),
     ]).then(([p, c, pr]) => {
       if (p.error) setError(p.error);
       const promos = new Map((pr.data ?? []).map((x) => [x.producto_id, Number(x.precio_promo)]));
-      setProductos((p.data ?? []).map((x) => ({ ...x, precio_lista: Number(x.precio), precio: promos.has(x.id) ? promos.get(x.id) : Number(x.precio), promo: promos.has(x.id) })));
+      setProductos((p.data ?? []).map((x) => ({
+        ...x,
+        venta_por: Number(x.venta_por) || 1,
+        precio_lista: Number(x.precio),
+        precio: promos.has(x.id) ? promos.get(x.id) : Number(x.precio),
+        promo: promos.has(x.id),
+      })));
       setClientes(c.data ?? []);
     });
   }, []);
@@ -181,8 +188,9 @@ function NuevaVenta({ onClose, onSaved }) {
   function add(p) {
     setItems((list) => {
       const i = list.findIndex((x) => x.producto_id === p.id);
-      if (i >= 0) return list.map((x, j) => (j === i ? { ...x, cantidad: round3(Number(x.cantidad) + 1) } : x));
-      return [...list, { producto_id: p.id, nombre: p.nombre, unidad: p.unidad, stock: Number(p.stock), cantidad: 1, precio_unitario: Number(p.precio), promo: p.promo }];
+      const step = p.venta_por ?? 1;
+      if (i >= 0) return list.map((x, j) => (j === i ? { ...x, cantidad: round3(Number(x.cantidad) + step) } : x));
+      return [...list, { producto_id: p.id, nombre: p.nombre, unidad: p.unidad, venta_por: step, stock: Number(p.stock), cantidad: step, precio_unitario: Number(p.precio), promo: p.promo }];
     });
     setQ('');
   }
@@ -225,7 +233,7 @@ function NuevaVenta({ onClose, onSaved }) {
                 <button key={p.id} type="button" className="sale-result" onClick={() => add(p)}>
                   <span className="sale-result-name">{p.nombre}{p.promo && <span className="tag tag-accent-2 cell-tag">Promo</span>}</span>
                   <span className="text-muted sale-result-meta">
-                    {fmtMoney(p.precio)} / {p.unidad} · stock {fmtQty(p.stock)}
+                    {fmtMoney(precioPresentacion(p.precio, p.venta_por))} / {etiquetaPresentacion(p.unidad, p.venta_por)} · stock {fmtQty(p.stock, p.unidad)}
                   </span>
                 </button>
               ))}

@@ -3,8 +3,34 @@ import { Plus, Pencil, Settings2, Trash2, Star } from 'lucide-react';
 import { supabase } from '../../lib/supabase.js';
 import { fmtMoney, fmtQty, UNIDADES } from '../lib/format.js';
 import { Confirm, EmptyState, ErrorBox, Field, Modal, PageHead, SearchBox, Spinner, useAutoFocus, useToast } from '../components/ui.jsx';
+import { etiquetaPresentacion, precioPresentacion } from '../../lib/precios.js';
 
-const empty = { nombre: '', categoria_id: '', unidad: 'un', precio: '', costo: '', stock: '', stock_minimo: '', activo: true, imagen_url: '', descripcion: '' };
+// Opciones de venta_por según la unidad base.
+const VENTA_POR_OPTS = {
+  kg: [
+    { value: 0.1,  label: '100 g'  },
+    { value: 0.25, label: '250 g'  },
+    { value: 0.5,  label: '500 g'  },
+    { value: 1,    label: '1 kg'   },
+  ],
+  l: [
+    { value: 0.25, label: '250 ml' },
+    { value: 0.5,  label: '500 ml' },
+    { value: 1,    label: '1 l'    },
+  ],
+  un: [
+    { value: 1, label: 'unidad' },
+  ],
+  g: [
+    { value: 1, label: 'gramo' },
+  ],
+};
+
+const empty = {
+  nombre: '', categoria_id: '', unidad: 'un', venta_por: '1',
+  precio: '', costo: '', stock: '', stock_minimo: '',
+  activo: true, imagen_url: '', descripcion: '',
+};
 
 export default function Articulos() {
   const toast = useToast();
@@ -57,12 +83,16 @@ export default function Articulos() {
   async function save(values) {
     setBusy(true);
     const catNombre = categorias.find((c) => c.id === values.categoria_id)?.nombre ?? null;
+    const vp = Number(values.venta_por) || 1;
+    // El admin ingresa el precio de la presentación; se guarda precio base (por unidad completa).
+    const precioBase = vp > 0 ? Math.round(Number(values.precio) / vp) : Number(values.precio);
     const payload = {
       nombre: values.nombre.trim(),
       categoria_id: values.categoria_id || null,
       categoria: catNombre,
       unidad: values.unidad,
-      precio: Number(values.precio) || 0,
+      venta_por: vp,
+      precio: precioBase,
       costo: values.costo === '' ? null : Number(values.costo),
       stock_minimo: Number(values.stock_minimo) || 0,
       activo: values.activo,
@@ -126,16 +156,20 @@ export default function Articulos() {
               <tr>
                 <th>Artículo</th>
                 <th>Categoría</th>
-                <th>Unidad</th>
-                <th className="num">Costo</th>
-                <th className="num">Precio</th>
+                <th>Presentación</th>
+                <th className="num">Precio público</th>
                 <th className="num">Margen</th>
                 <th className="col-actions" aria-label="Acciones" />
               </tr>
             </thead>
             <tbody>
               {filtered.map((p) => {
-                const margen = p.costo != null && Number(p.costo) > 0 ? Math.round(((Number(p.precio) - Number(p.costo)) / Number(p.costo)) * 100) : null;
+                const vp = Number(p.venta_por) || 1;
+                const precioPublico = precioPresentacion(p.precio, vp);
+                const etiqUnidad = etiquetaPresentacion(p.unidad, vp);
+                const margen = p.costo != null && Number(p.costo) > 0
+                  ? Math.round(((Number(p.precio) - Number(p.costo)) / Number(p.costo)) * 100)
+                  : null;
                 const catNombre = categorias.find((c) => c.id === p.categoria_id)?.nombre ?? p.categoria;
                 return (
                   <tr key={p.id} className={!p.activo ? 'is-inactive' : ''}>
@@ -151,9 +185,8 @@ export default function Articulos() {
                       </div>
                     </td>
                     <td>{catNombre || <span className="text-muted">—</span>}</td>
-                    <td className="text-muted">{UNIDADES.find((u) => u.value === p.unidad)?.label ?? p.unidad}</td>
-                    <td className="num text-muted">{p.costo != null ? fmtMoney(p.costo) : '—'}</td>
-                    <td className="num"><strong>{fmtMoney(p.precio)}</strong></td>
+                    <td className="text-muted">{etiqUnidad}</td>
+                    <td className="num"><strong>{fmtMoney(precioPublico)}</strong></td>
                     <td className="num text-muted">{margen != null ? `${margen}%` : '—'}</td>
                     <td className="col-actions">
                       <button
@@ -377,14 +410,32 @@ function ImageUpload({ value, onChange }) {
 /* ─── Formulario artículo ─── */
 
 function ArticuloForm({ initial, isNew, categorias, busy, onSave, onClose }) {
+  const vp = Number(initial.venta_por) || 1;
+  // Al editar, mostrar el precio en la presentación elegida.
+  const precioInicial = initial.precio !== '' && !isNew
+    ? String(precioPresentacion(initial.precio, vp))
+    : (initial.precio ?? '');
+
   const [v, setV] = useState({
     ...empty,
     ...Object.fromEntries(Object.entries(initial).map(([k, val]) => [k, val ?? ''])),
     activo: initial.activo ?? true,
     categoria_id: initial.categoria_id ?? '',
+    venta_por: String(vp),
+    precio: precioInicial,
   });
   const ref = useAutoFocus();
   const set = (k) => (e) => setV((s) => ({ ...s, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }));
+
+  // Cuando cambia la unidad, resetear venta_por al primer valor disponible.
+  function handleUnidad(e) {
+    const u = e.target.value;
+    const opts = VENTA_POR_OPTS[u] ?? [{ value: 1, label: 'unidad' }];
+    setV((s) => ({ ...s, unidad: u, venta_por: String(opts[0].value) }));
+  }
+
+  const ventaPorOpts = VENTA_POR_OPTS[v.unidad] ?? [{ value: 1, label: 'unidad' }];
+  const etiqPrecio = etiquetaPresentacion(v.unidad, Number(v.venta_por) || 1);
 
   return (
     <Modal title={isNew ? 'Nuevo artículo' : 'Editar artículo'} onClose={onClose}>
@@ -408,19 +459,24 @@ function ArticuloForm({ initial, isNew, categorias, busy, onSave, onClose }) {
             {categorias.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
           </select>
         </Field>
-        <Field label="Se vende por">
-          <select className="input" value={v.unidad} onChange={set('unidad')}>
+        <Field label="Unidad base">
+          <select className="input" value={v.unidad} onChange={handleUnidad}>
             {UNIDADES.map((u) => <option key={u.value} value={u.value}>{u.label} ({u.value})</option>)}
           </select>
         </Field>
-        <Field label={`Precio de venta por ${v.unidad} *`}>
-          <input className="input" type="number" min="0" step="0.01" inputMode="decimal" value={v.precio} onChange={set('precio')} required />
+        <Field label="Se vende por">
+          <select className="input" value={v.venta_por} onChange={set('venta_por')}>
+            {ventaPorOpts.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
         </Field>
-        <Field label="Costo (opcional)" hint="Para calcular margen y valor del stock.">
+        <Field label={`Precio por ${etiqPrecio} *`} hint="Se guarda el precio por unidad base automáticamente.">
+          <input className="input" type="number" min="0" step="1" inputMode="decimal" value={v.precio} onChange={set('precio')} required />
+        </Field>
+        <Field label="Costo por unidad base (opcional)" hint="Para calcular margen y valor del stock.">
           <input className="input" type="number" min="0" step="0.01" inputMode="decimal" value={v.costo} onChange={set('costo')} />
         </Field>
         {isNew ? (
-          <Field label={`Stock inicial (${v.unidad})`} hint="Queda registrado como ingreso.">
+          <Field label={`Stock inicial (${v.unidad})`} hint="En unidad base. Queda registrado como ingreso.">
             <input className="input" type="number" min="0" step="0.001" inputMode="decimal" value={v.stock} onChange={set('stock')} />
           </Field>
         ) : (

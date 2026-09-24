@@ -138,7 +138,7 @@ section[id] { scroll-margin-top: 92px; }
 /* ═════════ Tarjetas de producto (compartido) ═════════ */
 .pn-card {
   background: #fff; border: 1px solid var(--pn-line-card); border-radius: var(--radius-card);
-  overflow: hidden; display: flex; flex-direction: column;
+  overflow: hidden; display: flex; flex-direction: column; cursor: pointer; text-decoration: none; color: inherit;
 }
 .pn-card:hover { transform: translateY(-6px); box-shadow: var(--shadow-card); }
 .pn-card:hover .pn-thumb { transform: scale(1.04); }
@@ -266,6 +266,9 @@ section[id] { scroll-margin-top: 92px; }
 }
 .pn-chip:hover { transform: translateY(-2px); }
 .pn-chip.is-active { background: var(--pn-accent); color: #fff; border-color: var(--pn-accent); }
+.pn-chips-sep { width: 1px; height: 22px; background: var(--pn-line-input); flex: none; margin: 0 4px; }
+.pn-chip-sort { appearance: auto; padding: 0 14px; cursor: pointer; }
+.pn-chip-sort:hover { transform: none; }
 
 .pn-cat-content {
   min-height: 1600px; padding: 56px var(--page-px); display: flex; align-items: flex-start; gap: 32px; background: #fff;
@@ -282,6 +285,9 @@ section[id] { scroll-margin-top: 92px; }
 .pn-product .pn-card-desc { font-size: 13px; line-height: 1.45; }
 .pn-product-price { margin-top: auto; display: flex; align-items: baseline; gap: 6px; }
 .pn-unit { font-size: 12px; color: var(--pn-subtle); }
+.pn-price-ref { font-size: 12px; color: var(--pn-subtle); }
+.pn-fav-price { display: flex; align-items: baseline; gap: 6px; }
+.pn-product-highlight { outline: 2px solid var(--pn-accent); box-shadow: var(--shadow-card); transition: outline 0.15s ease; }
 .pn-add {
   margin-top: 10px; height: 44px; flex: none; border-radius: 14px; border: 1px solid var(--pn-line-control);
   background: #fff; color: var(--pn-ink); font-size: 14px; font-weight: 500; cursor: pointer;
