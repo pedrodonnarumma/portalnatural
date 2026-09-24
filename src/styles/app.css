@@ -292,6 +292,13 @@ a:hover { color: var(--color-accent-600); text-decoration: underline; }
   .hero-blob-1 { width: 240px; height: 240px; right: -40px; }
   .site-nav { flex-wrap: wrap; row-gap: 10px; }
 }
+/* — catálogo completo (/catalogo) — */
+a.product-card { text-decoration: none; color: inherit; display: flex; flex-direction: column; }
+a.product-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.catalog-summary-link { color: var(--color-accent); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.catalogo-back { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; color: var(--color-text); opacity: 0.6; margin-bottom: 8px; }
+.catalogo-back:hover { opacity: 1; }
+
 @media (max-width: 380px) {
   .hero { grid-template-columns: 1fr; }
   .split { grid-template-columns: 1fr; }

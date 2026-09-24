@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { categorias, productos } from '../data/products.js';
+import { useEffect, useMemo, useState } from 'react';
+import { supabase, supabaseConfigured } from '../lib/supabase.js';
 import { showPrices } from '../data/site.js';
 
 const plates = [
@@ -8,34 +8,70 @@ const plates = [
   { bg: 'var(--color-neutral-200)', ink: 'var(--color-accent-2-700)' },
 ];
 
+const money = (n) =>
+  new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n);
+
 function ProductCard({ producto, index }) {
   const plate = plates[index % plates.length];
+  const precio = showPrices
+    ? `${money(Number(producto.precio))} / ${producto.unidad}`
+    : 'Consultá el precio';
+
   return (
     <article className="product-card">
       <div className="product-plate" style={{ background: plate.bg, color: plate.ink }}>
-        {producto.foto ? (
-          <img src={producto.foto} alt={producto.nombre} className="washed" loading="lazy" />
+        {producto.imagen_url ? (
+          <img src={producto.imagen_url} alt={producto.nombre} className="washed" loading="lazy" />
         ) : (
           <span className="product-initial" aria-hidden="true">{producto.nombre.charAt(0)}</span>
         )}
-        <span className="product-badge">{producto.grupo}</span>
+        <span className="product-badge">{producto.categoria?.nombre ?? 'General'}</span>
       </div>
       <div className="product-body">
-        <span className="product-cat">{producto.categoria}</span>
+        <span className="product-cat">{producto.categoria?.nombre ?? ''}</span>
         <h3 className="product-name">{producto.nombre}</h3>
-        <p className="product-detail">{producto.detalle}</p>
-        <span className="product-price">{showPrices ? producto.precio : 'Consultá el precio'}</span>
+        {producto.descripcion && <p className="product-detail">{producto.descripcion}</p>}
+        <span className="product-price">{precio}</span>
       </div>
     </article>
   );
 }
 
 export default function Catalog() {
+  const [productos, setProductos] = useState(null);
   const [cat, setCat] = useState('Todos');
-  const items = productos.filter((p) => cat === 'Todos' || p.grupo === cat);
+
+  useEffect(() => {
+    if (!supabaseConfigured) return;
+    supabase
+      .from('productos')
+      .select('id, nombre, unidad, precio, imagen_url, descripcion, categoria:categorias(id, nombre, orden)')
+      .eq('activo', true)
+      .order('nombre')
+      .then(({ data }) => setProductos(data ?? []));
+  }, []);
+
+  const categorias = useMemo(() => {
+    if (!productos) return [{ id: 'todos', nombre: 'Todos' }];
+    const map = new Map();
+    for (const p of productos) {
+      if (p.categoria) map.set(p.categoria.id, p.categoria);
+    }
+    const sorted = [...map.values()].sort((a, b) => a.orden - b.orden || a.nombre.localeCompare(b.nombre));
+    return [{ id: 'todos', nombre: 'Todos' }, ...sorted];
+  }, [productos]);
+
+  const items = useMemo(() => {
+    if (!productos) return [];
+    return cat === 'todos' ? productos : productos.filter((p) => p.categoria?.id === cat);
+  }, [productos, cat]);
+
+  const catNombre = categorias.find((c) => c.id === cat)?.nombre ?? '';
   const resumen =
-    `${items.length} ${items.length === 1 ? 'producto' : 'productos'} en ` +
-    `${cat === 'Todos' ? 'el catálogo' : cat.toLowerCase()} · el catálogo completo está en el local.`;
+    productos === null
+      ? null
+      : `${items.length} ${items.length === 1 ? 'producto' : 'productos'} en ` +
+        `${cat === 'todos' ? 'el catálogo' : catNombre.toLowerCase()} · el catálogo completo está en el local.`;
 
   return (
     <section id="catalogo" className="catalog">
@@ -53,25 +89,37 @@ export default function Catalog() {
         <div className="chips" role="group" aria-label="Filtrar por categoría">
           {categorias.map((c) => (
             <button
-              key={c}
+              key={c.id}
               type="button"
-              className={`chip${c === cat ? ' is-active' : ''}`}
-              aria-pressed={c === cat}
-              onClick={() => setCat(c)}
+              className={`chip${c.id === cat ? ' is-active' : ''}`}
+              aria-pressed={c.id === cat}
+              onClick={() => setCat(c.id)}
             >
-              {c}
+              {c.nombre}
             </button>
           ))}
         </div>
 
-        {/* key={cat} remonta el grid para que las cards reentren con pn-rise */}
-        <div className="product-grid" key={cat}>
-          {items.map((p, i) => (
-            <ProductCard key={p.nombre} producto={p} index={i} />
-          ))}
-        </div>
+        {productos === null && (
+          <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-neutral-500)' }}>
+            Cargando productos…
+          </div>
+        )}
 
-        <p className="catalog-summary" aria-live="polite">{resumen}</p>
+        {productos !== null && (
+          <div className="product-grid" key={cat}>
+            {items.map((p, i) => (
+              <ProductCard key={p.id} producto={p} index={i} />
+            ))}
+            {items.length === 0 && (
+              <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '3rem', color: 'var(--color-neutral-500)' }}>
+                No hay productos en esta categoría todavía.
+              </div>
+            )}
+          </div>
+        )}
+
+        {resumen && <p className="catalog-summary" aria-live="polite">{resumen}</p>}
       </div>
     </section>
   );

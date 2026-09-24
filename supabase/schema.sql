@@ -238,3 +238,68 @@ create or replace view public.precios_promo_vigentes as
     and p.fecha_inicio <= current_date
     and (p.fecha_fin is null or p.fecha_fin >= current_date)
   group by pi.producto_id;
+
+-- ───────────────────────── Categorías ─────────────────────────
+create table if not exists public.categorias (
+  id         uuid primary key default gen_random_uuid(),
+  nombre     text not null unique,
+  orden      smallint not null default 0,
+  created_at timestamptz not null default now()
+);
+
+alter table public.categorias enable row level security;
+
+do $$
+begin
+  execute 'drop policy if exists "auth_all" on public.categorias';
+  execute 'create policy "auth_all" on public.categorias for all to authenticated using (true) with check (true)';
+  if not exists (select 1 from pg_policies where tablename = 'categorias' and policyname = 'public_read') then
+    execute 'create policy "public_read" on public.categorias for select to anon using (true)';
+  end if;
+end $$;
+
+-- FK en productos
+alter table public.productos add column if not exists categoria_id uuid references public.categorias(id) on delete set null;
+
+-- Migración: insertar categorías desde los textos existentes y vincular productos
+insert into public.categorias (nombre)
+select distinct categoria from public.productos where categoria is not null and categoria != ''
+on conflict (nombre) do nothing;
+
+update public.productos p
+set categoria_id = c.id
+from public.categorias c
+where p.categoria = c.nombre and p.categoria_id is null;
+
+-- ───────────────────────── Imágenes y descripciones ─────────────────────────
+alter table public.productos add column if not exists imagen_url text;
+alter table public.productos add column if not exists descripcion text;
+alter table public.productos add column if not exists destacado boolean not null default false;
+
+-- Lectura pública de productos activos para la landing (sin autenticación).
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies where tablename = 'productos' and policyname = 'public_read'
+  ) then
+    execute 'create policy "public_read" on public.productos for select to anon using (activo = true)';
+  end if;
+end $$;
+
+-- Bucket de Storage para imágenes de productos (archivos públicos).
+insert into storage.buckets (id, name, public)
+values ('productos', 'productos', true)
+on conflict (id) do update set public = true;
+
+do $$
+begin
+  if not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'productos_public_read') then
+    execute 'create policy "productos_public_read" on storage.objects for select to public using (bucket_id = ''productos'')';
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'productos_auth_write') then
+    execute 'create policy "productos_auth_write" on storage.objects for insert to authenticated with check (bucket_id = ''productos'')';
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'productos_auth_delete') then
+    execute 'create policy "productos_auth_delete" on storage.objects for delete to authenticated using (bucket_id = ''productos'')';
+  end if;
+end $$;
