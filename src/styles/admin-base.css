@@ -1,108 +1,50 @@
-/* Organic — design-system tokens and component classes. This file is the source of truth for the system's look; retune it here and see readme.md. */
-@import url('https://fonts.googleapis.com/css2?family=Caprasimo:wght@400&family=Figtree:wght@400;600;700&display=swap');
+/* Panel de gestión — capa de componentes (ex organic.css) sobre la paleta verde.
+   Los nombres de variables viejos se mantienen como alias de los tokens nuevos de theme.css. */
 
 :root {
-  --color-bg: #f5ead8;
-  --color-surface: #ebddc5;
-  --color-text: #201e1d;
-  --color-accent: #c67139;
-  --color-accent-2: #7a8a5e;
-  --color-divider: color-mix(in srgb, #201e1d 16%, transparent);
+  --color-bg: var(--pn-white);
+  --color-surface: var(--pn-band);
+  --color-text: var(--pn-ink);
+  --color-accent: var(--pn-accent);
+  --color-accent-2: var(--pn-accent);
+  --color-divider: var(--pn-line);
+  --text-60: var(--pn-subtle);
 
-  /* Tonal ramps — generated in OKLCH on one shared lightness scale, so the
-     same step of any role matches the others in visual value. */
-  --color-neutral-100: #f9f4ed;
-  --color-neutral-200: #eee7db;
-  --color-neutral-300: #dcd3c4;
-  --color-neutral-400: #c0b6a5;
-  --color-neutral-500: #a19786;
-  --color-neutral-600: #82796a;
-  --color-neutral-700: #645c50;
-  --color-neutral-800: #474238;
-  --color-neutral-900: #2e2b25;
+  --color-neutral-100: #fbfcfa;
+  --color-neutral-200: var(--pn-tint);
+  --color-neutral-300: var(--pn-line-rule);
+  --color-neutral-400: var(--pn-line-control);
+  --color-neutral-500: #9aa8a0;
+  --color-neutral-900: var(--pn-ink);
 
-  --color-accent-100: #fff2eb;
-  --color-accent-200: #ffe1d0;
-  --color-accent-300: #ffc6a5;
-  --color-accent-400: #f6a06b;
-  --color-accent-500: #d67f48;
-  --color-accent-600: #b2622d;
-  --color-accent-700: #8c491a;
-  --color-accent-800: #643312;
-  --color-accent-900: #402310;
+  /* acento = verde de marca */
+  --color-accent-100: var(--pn-tint);
+  --color-accent-600: var(--pn-accent-hover);
+  --color-accent-700: var(--pn-accent);
+  /* acento-2 = verde (activo, éxito) */
+  --color-accent-2-100: var(--pn-tint);
+  --color-accent-2-600: var(--pn-thumb-icon);
+  --color-accent-2-700: var(--pn-accent);
+  --color-accent-2-800: var(--pn-accent-hover);
 
-  --color-accent-2-100: #f0fae1;
-  --color-accent-2-200: #e1eecc;
-  --color-accent-2-300: #ccdbb2;
-  --color-accent-2-400: #aebf92;
-  --color-accent-2-500: #8fa073;
-  --color-accent-2-600: #728157;
-  --color-accent-2-700: #56633f;
-  --color-accent-2-800: #3d472b;
-  --color-accent-2-900: #272e1b;
-
-  --font-heading: "Caprasimo", system-ui, sans-serif;
-  --font-heading-weight: 400;
-  --font-body: "Figtree", system-ui, sans-serif;
-
-  --space-1: 4.4px;
-  --space-2: 8.8px;
-  --space-3: 13.2px;
-  --space-4: 17.6px;
-  --space-6: 26.4px;
-  --space-8: 35.2px;
-
+  --font-heading: var(--font-display);
+  --font-heading-weight: 600;
   --radius-sm: 8px;
   --radius-md: 16px;
-  --radius-lg: 28px;
-
-  /* Elevation — derived from the ground: soft ink-tinted shadows on a
-     light theme, a hairline edge + ambient darkness on a dark one. */
-  --shadow-sm: 0 1px 2px color-mix(in srgb, #2e2b25 14%, transparent);
-  --shadow-md: 0 3px 10px color-mix(in srgb, #2e2b25 16%, transparent);
-  --shadow-lg: 0 12px 32px color-mix(in srgb, #2e2b25 22%, transparent);
+  --radius-lg: 24px;
+  --shadow-sm: 0 1px 2px rgba(30, 58, 43, 0.08);
+  --shadow-md: 0 8px 24px rgba(30, 58, 43, 0.12);
+  --shadow-lg: var(--shadow-card);
+  --space-1: 4.4px; --space-2: 8.8px; --space-3: 13.2px; --space-4: 17.6px;
 }
 
-body {
-  background: var(--color-bg);
-  color: var(--color-text);
-  font-family: var(--font-body);
-}
-h1, h2, h3, h4 { font-family: var(--font-heading); font-weight: var(--font-heading-weight); }
-
-.washed{filter:saturate(0.6) contrast(0.85) brightness(1.1) opacity(0.94)}
-
-/* ══════════════════════════════════════════════════════════════════════════
-   Components — built with the tokens above. Plain CSS
-   on plain HTML: no JavaScript, no build step. Each class is documented in
-   readme.md and demonstrated in foundations/ and components/.
-   ══════════════════════════════════════════════════════════════════════ */
-
-*, *::before, *::after { box-sizing: border-box; }
-body { margin: 0; font-size: 15px; line-height: 1.55; font-weight: 400; }
-h1, h2, h3, h4, h5, h6 {
+.admin, .login { color: var(--color-text); font-size: 15px; line-height: 1.55; }
+.admin h1, .admin h2, .admin h3, .admin h4, .login h1, .login h2, .login h3 {
   font-family: var(--font-heading); font-weight: var(--font-heading-weight);
-  line-height: 1.12; letter-spacing: -0.015em; margin: 0 0 var(--space-2);
+  line-height: 1.15; letter-spacing: -0.015em; margin: 0 0 var(--space-2); color: var(--pn-ink);
 }
-h1 { font-size: 42px; }
-h2 { font-size: 32px; }
-h3 { font-size: 25px; }
-h4 { font-size: 20px; }
-h5 { font-size: 16px; }
-h6 { font-size: 13px; }
-h6 { letter-spacing: 0.08em; text-transform: uppercase; }
-p { margin: 0 0 var(--space-3); }
-a { color: var(--color-accent); text-underline-offset: 3px; }
-img { display: block; max-width: 100%; }
-figure { margin: 0; }
-figcaption {
-  font-size: 11px; margin-top: var(--space-1);
-  color: color-mix(in srgb, var(--color-text) 55%, transparent);
-}
-.text-muted { color: color-mix(in srgb, var(--color-text) 55%, transparent); }
-:focus { outline: none; }
-:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
-::selection { background: color-mix(in srgb, var(--color-accent) 30%, transparent); }
+.admin p, .login p { margin: 0 0 var(--space-3); }
+.text-muted { color: var(--pn-subtle); }
 
 /* — rules — */
 .hr {
@@ -114,7 +56,7 @@ figcaption {
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   cursor: pointer; text-decoration: none;
-  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-family: var(--font-body); font-weight: 500;
   font-size: 14px; line-height: 1.2; color: var(--color-text); /* matches the .input's 14px —
      the pair sits side by side in sign-up rows */
   background: transparent; border: 1px solid transparent;
@@ -143,7 +85,7 @@ figcaption {
 .input {
   width: 100%; min-height: 36px; padding: 6px 10px; font: inherit;
   font-size: 14px; color: var(--color-text); caret-color: var(--color-accent);
-  background: var(--color-surface);
+  background: #fff;
   border: 1px solid var(--color-divider); border-radius: var(--radius-md);
 }
 .input:hover { border-color: color-mix(in srgb, var(--color-text) 45%, transparent); }
@@ -201,9 +143,6 @@ textarea.input { min-height: 90px; resize: vertical; }
   letter-spacing: 0.02em; padding: 3px 10px;
   border-radius: calc(var(--radius-md) * 0.75);
 }
-.tag-accent { background: var(--color-accent-100); color: var(--color-accent-800); }
-.tag-accent-2 { background: var(--color-accent-2-100); color: var(--color-accent-2-800); }
-.tag-neutral { background: var(--color-neutral-100); color: var(--color-neutral-800); }
 .tag-outline { border: 1px solid var(--color-accent); color: var(--color-accent); }
 
 /* — navigation — */
@@ -255,3 +194,22 @@ textarea.input { min-height: 90px; resize: vertical; }
 .btn, .tag, .seg, .input { border-radius: 999px; }
 .input { padding-inline: 14px; }
 
+
+/* — piezas compartidas con la landing vieja que usa el panel — */
+.btn:hover { text-decoration: none; }
+.btn-primary, .btn-primary:hover { color: #fff; }
+.btn-secondary { background: #fff; border: 1px solid var(--pn-line-control); color: var(--pn-ink); }
+.btn-secondary:hover { background: var(--pn-tint); color: var(--pn-ink); }
+.btn-md { padding: 11px 22px; font-size: 15px; }
+.chips { display: flex; flex-wrap: wrap; gap: 10px; }
+.chip {
+  white-space: nowrap; cursor: pointer; font: inherit; font-size: 14px; font-weight: 500; line-height: 22px;
+  border-radius: 999px; padding: 9px 18px;
+  background: #fff; color: var(--pn-text); border: 1px solid var(--pn-line-input);
+  transition: background 0.2s ease;
+}
+.chip:hover { background: var(--pn-tint-hover); }
+.chip.is-active { background: var(--pn-accent); color: #fff; border-color: var(--pn-accent); }
+.tag-accent-2 { background: var(--pn-tint); color: var(--pn-accent); }
+.tag-neutral { background: var(--pn-band); color: var(--pn-muted); }
+.admin a { color: var(--pn-accent); }

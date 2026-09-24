@@ -1,53 +1,38 @@
-import { Leaf } from 'lucide-react';
-import HeroBranches from './HeroBranches.jsx';
-import Photo from './Photo.jsx';
-import { fotos, site } from '../data/site.js';
+import { Link } from 'react-router-dom';
+import PhotoFrame from './PhotoFrame.jsx';
+import { HeroSprout, SmallSprout, Sprout } from './icons.jsx';
+import { fotos } from '../data/site.js';
 
 export default function Hero() {
   return (
-    <section id="inicio" className="container hero">
-      <HeroBranches />
-      <div className="hero-copy">
-        <span className="tag tag-accent-2 hero-tag">
-          <Leaf size={14} strokeWidth={2.75} aria-hidden="true" />
+    <section id="inicio" className="pn-hero">
+      <div className="pn-hero-copy">
+        <span className="pn-tag">
+          <Sprout size={14} strokeWidth={2} className="pn-d" />
           Dietética de barrio
         </span>
-        <h1 className="hero-title">
-          <span>Comer bien,</span>
-          <span className="text-accent">simple y natural</span>
+        <h1 className="pn-hero-title">
+          Comer bien,<br />
+          <em>simple y natural</em>
         </h1>
-        <p className="hero-lead">
-          Semillas, frutos secos, harinas, suplementos y productos sin TACC. Seleccionamos cada partida a granel y
-          envasada para que tu alimentación sea más consciente.
+        <p className="pn-hero-lead">
+          <span className="pn-d">Semillas, frutos secos, harinas, suplementos y productos sin TACC. Seleccionamos cada producto a granel y envasado para que tu alimentación sea más consciente.</span>
+          <span className="pn-m">Semillas, frutos secos, harinas, suplementos y productos sin TACC, a granel y envasados.</span>
         </p>
-        <div className="hero-actions">
-          <a href="#catalogo" className="btn btn-primary btn-pill btn-lg">Explorar productos</a>
-          <a href="#ubicacion" className="btn btn-secondary btn-pill btn-lg">Cómo llegar</a>
+        <div className="pn-hero-actions">
+          <a className="pn-btn pn-btn-primary pn-btn-lg pn-d" href="#catalogo">Explorar productos</a>
+          <Link className="pn-btn pn-btn-primary pn-btn-lg pn-m" to="/catalogo">Ver catálogo</Link>
+          <a className="pn-btn pn-btn-ghost pn-btn-lg" href="#ubicacion">Cómo llegar</a>
         </div>
-        <dl className="hero-stats">
-          <div className="stat">
-            <dt className="stat-num text-accent-2">+50</dt>
-            <dd className="stat-label">productos seleccionados</dd>
-          </div>
-          <div className="stat">
-            <dt className="stat-num text-accent">100%</dt>
-            <dd className="stat-label">a granel, sin envases de más</dd>
-          </div>
-        </dl>
+        <div className="pn-stat pn-d">
+          <span className="pn-stat-num">+50</span>
+          <span className="pn-stat-label">productos seleccionados</span>
+        </div>
       </div>
-      <div className="hero-media">
-        <div className="blob hero-blob-1" aria-hidden="true" />
-        <div className="blob hero-blob-2" aria-hidden="true" />
-        <Photo
-          className="hero-photo"
-          src={fotos.local}
-          alt="El local de Portal Natural"
-          placeholder="Foto del local / mostrador"
-          ratio="5 / 6"
-          eager
-        />
-        <div className="hero-badge">{site.abiertoHoy}</div>
-      </div>
+      <PhotoFrame className="pn-hero-photo" src={fotos.local} alt="El local de Portal Natural" label="[Foto del local]">
+        <span className="pn-d"><HeroSprout size={420} /></span>
+        <span className="pn-m"><SmallSprout size={150} ground={false} strokeWidth={1.4} /></span>
+      </PhotoFrame>
     </section>
   );
 }

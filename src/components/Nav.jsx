@@ -1,15 +1,67 @@
+import { useEffect, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import Brand from './Brand.jsx';
+import { Close, Menu } from './icons.jsx';
 
-export default function Nav() {
+const LANDING_LINKS = [
+  { href: '#nosotros', label: 'Nosotros' },
+  { href: '#catalogo', label: 'Catálogo' },
+  { href: '#ubicacion', label: 'Ubicación' },
+  { href: '#contacto', label: 'Contacto' },
+];
+const CATALOG_LINKS = [
+  { to: '/', label: 'Inicio' },
+  { to: '/#nosotros', label: 'Nosotros' },
+  { to: '/#ubicacion', label: 'Ubicación' },
+];
+
+function NavItem({ item, className, onClick }) {
+  return item.to ? (
+    <Link className={className} to={item.to} onClick={onClick}>{item.label}</Link>
+  ) : (
+    <a className={className} href={item.href} onClick={onClick}>{item.label}</a>
+  );
+}
+
+// variant: 'landing' | 'catalog'
+export default function Nav({ variant = 'landing' }) {
+  const [open, setOpen] = useState(false);
+  const { pathname } = useLocation();
+  const links = variant === 'landing' ? LANDING_LINKS : CATALOG_LINKS;
+  const cta = variant === 'landing' ? { to: '/catalogo', label: 'Ver catálogo' } : { to: '/', label: 'Volver al inicio' };
+  const close = () => setOpen(false);
+
+  useEffect(close, [pathname]);
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => e.key === 'Escape' && close();
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open]);
+
   return (
-    <nav className="nav site-nav" aria-label="Principal">
-      <Brand as="a" href="#inicio" className="nav-home" />
-      <div className="nav-links">
-        <a href="#nosotros" className="nav-link">Nosotros</a>
-        <a href="#catalogo" className="nav-link">Catálogo</a>
-        <a href="#ubicacion" className="nav-link">Ubicación</a>
-        <a href="#contacto" className="btn btn-primary btn-pill nav-cta">Ver catálogo</a>
+    <header className={`pn-header${open ? ' is-open' : ''}`}>
+      <div className="pn-header-bar">
+        <Brand as={variant === 'landing' ? 'a' : Link} {...(variant === 'landing' ? { href: '#inicio' } : { to: '/' })} className="pn-header-brand" />
+        <nav className="pn-nav-desktop" aria-label="Principal">
+          {links.map((l) => <NavItem key={l.label} item={l} className="pn-nav-link" />)}
+          <Link className="pn-btn pn-btn-primary pn-btn-nav" to={cta.to}>{cta.label}</Link>
+        </nav>
+        <button
+          type="button"
+          className="pn-menu-btn"
+          aria-label={open ? 'Cerrar menú' : 'Abrir menú'}
+          aria-expanded={open}
+          aria-controls="pn-menu"
+          onClick={() => setOpen((o) => !o)}
+        >
+          {open ? <Close size={22} strokeWidth={1.8} /> : <Menu size={22} />}
+        </button>
       </div>
-    </nav>
+      <nav id="pn-menu" className="pn-menu" aria-label="Principal" hidden={!open}>
+        {links.map((l) => <NavItem key={l.label} item={l} className="pn-menu-link" onClick={close} />)}
+        <Link className="pn-btn pn-btn-primary pn-btn-block" to={cta.to} onClick={close}>{cta.label}</Link>
+      </nav>
+    </header>
   );
 }

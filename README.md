@@ -2,7 +2,7 @@
 
 Sitio de Portal Natural (dietética) en React + Vite. Tiene dos partes:
 
-- **Landing** en `/`: página pública, implementada a partir del handoff en `design_handoff_landing_portal_natural/`.
+- **Landing** en `/` y **catálogo extendido** en `/catalogo` (buscador, pedido y envío por WhatsApp). El diseño de referencia es `design/Design.html` (escritorio 1280 px, móvil 390 px y catálogo).
 - **Panel de gestión** en `/admin`: clientes, stock, ventas y reportes. Los datos viven en Supabase (Postgres en la nube) y el acceso es con usuario y contraseña.
 
 ## Para el equipo: accesos y recursos
@@ -99,12 +99,13 @@ Ya están incluidos `vercel.json` y `public/_redirects` para que `/admin` cargue
 
 ## Estructura
 
-- `src/styles/organic.css`: sistema de diseño Organic (tokens + clases).
-- `src/styles/app.css`: estilos de la landing. `src/styles/admin.css`: estilos del panel.
-- `src/components/`: secciones de la landing.
+- `src/styles/theme.css`: colores, fuentes (DM Sans y Fraunces, en `public/fonts/`) y base. `src/styles/site.css`: landing y catálogo; escritorio desde 1024 px, móvil por debajo.
+- `src/styles/admin-base.css` + `src/styles/admin.css`: estilos del panel (se cargan solo en `/admin`).
+- `src/pages/`: `Landing.jsx` y `Catalogo.jsx`. `src/components/`: secciones de la landing, `Nav`, `Brand` (logo en `public/logo.jpg`) e `icons.jsx` (íconos del diseño).
+- `src/lib/pedido.js`: pedido del catálogo (se guarda en el navegador) y armado del mensaje de WhatsApp. El número va en `site.whatsapp`.
 - `src/admin/`: panel. `AdminApp.jsx` (auth + rutas), `Layout.jsx`, `Login.jsx`, `pages/` (Ventas, Clientes, Artículos, Stock, Promociones, Reportes), `components/ui.jsx` (modal, toasts, campos), `lib/format.js` (formato de moneda, fechas, listas fijas).
 - `src/lib/supabase.js`: cliente de Supabase. `supabase/schema.sql`: esquema completo de la base. `supabase/functions/enviar-promocion/`: función que manda los mails. `supabase/cron.sql`: envío automático opcional.
-- `src/data/site.js` y `src/data/products.js`: datos de la landing (dirección, horarios, catálogo público).
+- `src/data/site.js` y `src/data/products.js`: datos públicos (dirección, horarios, WhatsApp, catálogo con precios y favoritos de la landing).
 - `src/lib/contact.js`: formulario de contacto. Sin `VITE_CONTACT_ENDPOINT`, el envío se simula.
 
 ## Pendiente del cliente

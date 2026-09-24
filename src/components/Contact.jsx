@@ -26,26 +26,23 @@ export default function Contact() {
     }
   }
 
-  const label =
-    status === 'loading' ? 'Enviando…' : status === 'sent' ? '¡Gracias! Te respondemos hoy' : 'Enviar consulta';
+  const label = status === 'loading' ? 'Enviando…' : status === 'sent' ? '¡Gracias! Te respondemos hoy' : 'Enviar consulta';
 
   return (
-    <section id="contacto" className="container contact">
-      <div className="contact-panel">
-        <div className="contact-blob" aria-hidden="true" />
-        <div className="contact-copy">
-          <h2 className="section-title contact-title">
-            ¿Buscás algo <span className="contact-highlight">en particular</span>?
-          </h2>
-          <p className="contact-text">
-            Escribinos y te decimos si lo tenemos, cuánto sale y te lo dejamos reservado hasta que pases.
+    <section id="contacto" className="pn-contact">
+      <div className="pn-contact-inner">
+        <div className="pn-contact-copy">
+          <h2 className="pn-h2 pn-contact-title">¿Buscás algo <em>en particular</em>?</h2>
+          <p className="pn-contact-text">
+            <span className="pn-d">Escribinos y te decimos si lo tenemos, cuánto sale y te lo dejamos reservado hasta que pases.</span>
+            <span className="pn-m">Escribinos y te lo reservamos hasta que pases.</span>
           </p>
         </div>
-        <form className="contact-form" onSubmit={handleSubmit} noValidate>
-          <label htmlFor="pn-mail">Tu correo o teléfono</label>
+        <form className="pn-contact-form" onSubmit={handleSubmit} noValidate>
+          <label htmlFor="pn-email">Tu correo o teléfono</label>
           <input
-            id="pn-mail"
-            className="input contact-input"
+            id="pn-email"
+            className="pn-contact-input"
             type="text"
             inputMode="email"
             autoComplete="email"
@@ -59,13 +56,11 @@ export default function Contact() {
               }
             }}
             aria-invalid={!!error}
-            aria-describedby={error ? 'pn-mail-error' : undefined}
+            aria-describedby={error ? 'pn-email-error' : undefined}
             required
           />
-          {error && (
-            <p id="pn-mail-error" className="contact-error" role="alert">{error}</p>
-          )}
-          <button type="submit" className="btn contact-submit" disabled={status === 'loading'} aria-live="polite">
+          {error && <p id="pn-email-error" className="pn-contact-error" role="alert">{error}</p>}
+          <button type="submit" className="pn-contact-submit" disabled={status === 'loading'} aria-live="polite">
             {label}
           </button>
         </form>

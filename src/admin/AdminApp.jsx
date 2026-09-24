@@ -10,6 +10,7 @@ import Articulos from './pages/Articulos.jsx';
 import Stock from './pages/Stock.jsx';
 import Promociones from './pages/Promociones.jsx';
 import Reportes from './pages/Reportes.jsx';
+import '../styles/admin-base.css';
 import '../styles/admin.css';
 
 function Gate() {
