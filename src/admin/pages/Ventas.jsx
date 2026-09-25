@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, Trash2, Ban, Eye } from 'lucide-react';
+import { Plus, Trash2, Ban, Eye, Check, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase.js';
 import { fmtDate, fmtMoney, fmtQty, MEDIOS_PAGO, medioPagoLabel, startOfDayISO, toDateInput } from '../lib/format.js';
 import { etiquetaPresentacion, precioPresentacion } from '../../lib/precios.js';
@@ -20,9 +20,23 @@ function rangeStart(key) {
   return null;
 }
 
+const SELECT_VENTAS = 'id, numero, fecha, medio_pago, total, notas, anulada, estado, origen, contacto_nombre, contacto_telefono, direccion_envio, pagada_at, cancelada_at, cliente:clientes(id, nombre)';
+
+function estadoTag(estado) {
+  if (estado === 'pendiente') return <span className="tag tag-warn">Pendiente</span>;
+  if (estado === 'cancelada') return <span className="tag tag-danger">Cancelada</span>;
+  return <span className="tag tag-ok">Pagada</span>;
+}
+
+function origenTag(origen) {
+  if (origen === 'web') return <span className="tag tag-accent">Web</span>;
+  return <span className="tag tag-neutral">Local</span>;
+}
+
 export default function Ventas() {
   const toast = useToast();
   const [rows, setRows] = useState(null);
+  const [pendientes, setPendientes] = useState(null);
   const [error, setError] = useState(null);
   const [rango, setRango] = useState('7');
   const [creating, setCreating] = useState(false);
@@ -30,10 +44,21 @@ export default function Ventas() {
   const [cancelling, setCancelling] = useState(null);
   const [busy, setBusy] = useState(false);
 
+  const loadPendientes = useCallback(async () => {
+    const { data, error: err } = await supabase
+      .from('ventas')
+      .select(SELECT_VENTAS)
+      .eq('estado', 'pendiente')
+      .order('fecha', { ascending: true })
+      .limit(100);
+    if (!err) setPendientes(data ?? []);
+  }, []);
+
   const load = useCallback(async () => {
     let query = supabase
       .from('ventas')
-      .select('id, numero, fecha, medio_pago, total, notas, anulada, cliente:clientes(id, nombre)')
+      .select(SELECT_VENTAS)
+      .neq('estado', 'pendiente')
       .order('fecha', { ascending: false })
       .limit(300);
     const from = rangeStart(rango);
@@ -44,34 +69,56 @@ export default function Ventas() {
   }, [rango]);
 
   useEffect(() => {
+    loadPendientes();
+  }, [loadPendientes]);
+
+  useEffect(() => {
     setRows(null);
     load();
   }, [load]);
 
-  const total = useMemo(() => (rows ?? []).filter((v) => !v.anulada).reduce((a, v) => a + Number(v.total), 0), [rows]);
+  const recargar = useCallback(() => { loadPendientes(); load(); }, [loadPendientes, load]);
 
-  async function cancel() {
+  const total = useMemo(
+    () => (rows ?? []).filter((v) => v.estado === 'pagada').reduce((a, v) => a + Number(v.total), 0),
+    [rows],
+  );
+  const totalPagadas = useMemo(
+    () => (rows ?? []).filter((v) => v.estado === 'pagada').length,
+    [rows],
+  );
+
+  async function cancelarVenta(v) {
     setBusy(true);
-    const { error: err } = await supabase.rpc('anular_venta', { p_venta_id: cancelling.id });
+    const { error: err } = await supabase.rpc('cancelar_venta', { p_venta_id: v.id });
     setBusy(false);
     if (err) return toast(err.message, 'error');
-    toast(`Venta #${cancelling.numero} anulada. El stock volvió a sumarse.`);
+    toast(`Venta #${v.numero} cancelada. El stock volvió a sumarse.`);
     setCancelling(null);
     setViewing(null);
-    load();
+    recargar();
   }
 
   return (
     <>
       <PageHead
         title="Ventas"
-        subtitle={rows ? `${rows.filter((v) => !v.anulada).length} ventas · ${fmtMoney(total)}` : null}
+        subtitle={rows ? `${totalPagadas} pagadas · ${fmtMoney(total)}` : null}
         actions={
           <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
             <Plus size={16} /> Nueva venta
           </button>
         }
       />
+
+      {/* Bloque de pendientes — siempre visible, sin filtro de fecha */}
+      <PendientesBloque
+        pendientes={pendientes}
+        onVer={(v) => setViewing(v)}
+        onMarcarPagado={(v) => setViewing({ ...v, _accion: 'pagar' })}
+        onCancelar={(v) => setCancelling(v)}
+      />
+
       <div className="toolbar">
         <div className="chips chips-inline">
           {RANGOS.map((r) => (
@@ -81,6 +128,7 @@ export default function Ventas() {
           ))}
         </div>
       </div>
+
       <ErrorBox error={error} />
       {!rows && !error && <Spinner />}
       {rows && rows.length === 0 && <EmptyState>No hay ventas en este período.</EmptyState>}
@@ -92,6 +140,7 @@ export default function Ventas() {
                 <th>#</th>
                 <th>Fecha</th>
                 <th>Cliente</th>
+                <th>Origen</th>
                 <th>Pago</th>
                 <th className="num">Total</th>
                 <th className="col-actions" aria-label="Acciones" />
@@ -99,14 +148,15 @@ export default function Ventas() {
             </thead>
             <tbody>
               {rows.map((v) => (
-                <tr key={v.id} className={v.anulada ? 'is-inactive' : ''}>
+                <tr key={v.id} className={v.estado === 'cancelada' ? 'is-inactive' : ''}>
                   <td className="text-muted">{v.numero}</td>
                   <td className="nowrap">{fmtDate(v.fecha, true)}</td>
-                  <td>{v.cliente?.nombre ?? <span className="text-muted">Consumidor final</span>}</td>
+                  <td>{v.cliente?.nombre ?? v.contacto_nombre ?? <span className="text-muted">Consumidor final</span>}</td>
+                  <td>{origenTag(v.origen)}</td>
                   <td>{medioPagoLabel(v.medio_pago)}</td>
                   <td className="num">
                     <strong>{fmtMoney(v.total)}</strong>
-                    {v.anulada && <span className="tag tag-neutral cell-tag">Anulada</span>}
+                    <span className="cell-tag">{estadoTag(v.estado)}</span>
                   </td>
                   <td className="col-actions">
                     <button type="button" className="btn btn-icon btn-secondary" onClick={() => setViewing(v)} aria-label={`Ver venta ${v.numero}`} title="Ver detalle">
@@ -126,19 +176,27 @@ export default function Ventas() {
           onSaved={(numero) => {
             toast(`Venta #${numero} registrada`);
             setCreating(false);
-            load();
+            recargar();
           }}
         />
       )}
-      {viewing && <DetalleVenta venta={viewing} onClose={() => setViewing(null)} onCancel={() => setCancelling(viewing)} />}
+      {viewing && (
+        <DetalleVenta
+          venta={viewing}
+          onClose={() => setViewing(null)}
+          onCancel={() => setCancelling(viewing)}
+          onPagada={() => recargar()}
+          initialAccion={viewing._accion}
+        />
+      )}
       {cancelling && (
         <Confirm
-          title={`Anular venta #${cancelling.numero}`}
-          text="La venta queda marcada como anulada y los productos vuelven al stock. No se puede deshacer."
-          confirmLabel="Anular venta"
+          title={`Cancelar venta #${cancelling.numero}`}
+          text="La venta queda cancelada y los productos vuelven al stock. No se puede deshacer."
+          confirmLabel="Cancelar venta"
           danger
           busy={busy}
-          onConfirm={cancel}
+          onConfirm={() => cancelarVenta(cancelling)}
           onClose={() => setCancelling(null)}
         />
       )}
@@ -146,7 +204,68 @@ export default function Ventas() {
   );
 }
 
-/* ───────── Nueva venta ───────── */
+/* ── Bloque pendientes ── */
+function PendientesBloque({ pendientes, onVer, onMarcarPagado, onCancelar }) {
+  if (!pendientes || pendientes.length === 0) return null;
+
+  return (
+    <div className="pendientes-bloque">
+      <div className="pendientes-head">
+        <span className="pendientes-title">Pedidos pendientes</span>
+        <span className="chip chip-sm is-active">{pendientes.length}</span>
+      </div>
+      <div className="table-wrap">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Fecha y hora</th>
+              <th>Contacto</th>
+              <th>Teléfono</th>
+              <th>Origen</th>
+              <th className="num">Total</th>
+              <th className="col-actions" aria-label="Acciones" />
+            </tr>
+          </thead>
+          <tbody>
+            {pendientes.map((v) => {
+              const nombre = v.cliente?.nombre ?? v.contacto_nombre ?? 'Sin nombre';
+              const tel = v.contacto_telefono;
+              const telDigits = tel ? tel.replace(/\D/g, '') : null;
+              return (
+                <tr key={v.id}>
+                  <td className="text-muted">{v.numero}</td>
+                  <td className="nowrap">{fmtDate(v.fecha, true)}</td>
+                  <td>{nombre}</td>
+                  <td className="nowrap">
+                    {tel
+                      ? <a href={`https://wa.me/${telDigits}`} target="_blank" rel="noopener noreferrer" className="text-muted">{tel}</a>
+                      : <span className="text-muted">—</span>}
+                  </td>
+                  <td>{origenTag(v.origen)}</td>
+                  <td className="num"><strong>{fmtMoney(v.total)}</strong></td>
+                  <td className="col-actions">
+                    <button type="button" className="btn btn-icon btn-secondary" onClick={() => onVer(v)} title="Ver detalle" aria-label={`Ver pedido ${v.numero}`}>
+                      <Eye size={15} />
+                    </button>
+                    <button type="button" className="btn btn-icon btn-primary" onClick={() => onMarcarPagado(v)} title="Marcar como pagado" aria-label={`Marcar pagado #${v.numero}`}>
+                      <Check size={15} />
+                    </button>
+                    <button type="button" className="btn btn-icon btn-danger" onClick={() => onCancelar(v)} title="Cancelar pedido" aria-label={`Cancelar #${v.numero}`}>
+                      <X size={15} />
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/* ── Nueva venta ── */
 function NuevaVenta({ onClose, onSaved }) {
   const toast = useToast();
   const [productos, setProductos] = useState(null);
@@ -155,6 +274,8 @@ function NuevaVenta({ onClose, onSaved }) {
   const [items, setItems] = useState([]);
   const [clienteId, setClienteId] = useState('');
   const [medio, setMedio] = useState('efectivo');
+  const [estadoVenta, setEstadoVenta] = useState('pagada');
+  const [direccion, setDireccion] = useState('');
   const [notas, setNotas] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -208,8 +329,10 @@ function NuevaVenta({ onClose, onSaved }) {
     const { data, error: err } = await supabase.rpc('registrar_venta', {
       p_items: items.map((x) => ({ producto_id: x.producto_id, cantidad: Number(x.cantidad), precio_unitario: Number(x.precio_unitario) })),
       p_cliente_id: clienteId || null,
-      p_medio_pago: medio,
+      p_medio_pago: estadoVenta === 'pendiente' ? 'efectivo' : medio,
       p_notas: notas.trim() || null,
+      p_estado: estadoVenta,
+      p_direccion_envio: direccion.trim() || null,
     });
     if (err) {
       setBusy(false);
@@ -296,10 +419,25 @@ function NuevaVenta({ onClose, onSaved }) {
               {clientes.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
             </select>
           </Field>
-          <Field label="Medio de pago">
-            <select className="input" value={medio} onChange={(e) => setMedio(e.target.value)}>
-              {MEDIOS_PAGO.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-            </select>
+          <Field label="Estado">
+            <div className="seg">
+              <button type="button" className={`btn seg-opt${estadoVenta === 'pagada' ? ' btn-primary' : ' btn-secondary'}`} onClick={() => setEstadoVenta('pagada')}>
+                Pagada
+              </button>
+              <button type="button" className={`btn seg-opt${estadoVenta === 'pendiente' ? ' btn-primary' : ' btn-secondary'}`} onClick={() => setEstadoVenta('pendiente')}>
+                Pendiente
+              </button>
+            </div>
+          </Field>
+          {estadoVenta === 'pagada' && (
+            <Field label="Medio de pago">
+              <select className="input" value={medio} onChange={(e) => setMedio(e.target.value)}>
+                {MEDIOS_PAGO.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+              </select>
+            </Field>
+          )}
+          <Field label="Dirección de envío" span={estadoVenta === 'pagada'}>
+            <input className="input" value={direccion} onChange={(e) => setDireccion(e.target.value)} placeholder="Opcional" />
           </Field>
           <Field label="Notas" span>
             <input className="input" value={notas} onChange={(e) => setNotas(e.target.value)} placeholder="Opcional" />
@@ -313,7 +451,9 @@ function NuevaVenta({ onClose, onSaved }) {
           </div>
           <div className="dialog-actions">
             <button type="button" className="btn btn-secondary" onClick={onClose} disabled={busy}>Cancelar</button>
-            <button type="submit" className="btn btn-primary btn-md" disabled={!valid || busy}>{busy ? 'Registrando…' : 'Registrar venta'}</button>
+            <button type="submit" className="btn btn-primary btn-md" disabled={!valid || busy}>
+              {busy ? 'Registrando…' : estadoVenta === 'pendiente' ? 'Guardar pedido' : 'Registrar venta'}
+            </button>
           </div>
         </div>
       </form>
@@ -321,10 +461,17 @@ function NuevaVenta({ onClose, onSaved }) {
   );
 }
 
-/* ───────── Detalle ───────── */
-function DetalleVenta({ venta, onClose, onCancel }) {
+/* ── Detalle de venta ── */
+function DetalleVenta({ venta: ventaInit, onClose, onCancel, onPagada, initialAccion }) {
+  const toast = useToast();
   const [items, setItems] = useState(null);
   const [error, setError] = useState(null);
+  const [venta, setVenta] = useState(ventaInit);
+  const [accion, setAccion] = useState(initialAccion ?? null); // 'pagar' | 'cancelar' | null
+  const [medioPago, setMedioPago] = useState('efectivo');
+  const [direccion, setDireccion] = useState(ventaInit.direccion_envio ?? '');
+  const [guardandoDir, setGuardandoDir] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     supabase
@@ -334,15 +481,87 @@ function DetalleVenta({ venta, onClose, onCancel }) {
       .then(({ data, error: err }) => (err ? setError(err) : setItems(data)));
   }, [venta.id]);
 
+  async function marcarPagado() {
+    setBusy(true);
+    const { error: err } = await supabase.rpc('marcar_venta_pagada', {
+      p_venta_id: venta.id,
+      p_medio_pago: medioPago,
+    });
+    setBusy(false);
+    if (err) return toast(err.message, 'error');
+    toast(`Venta #${venta.numero} marcada como pagada.`);
+    setVenta((v) => ({ ...v, estado: 'pagada', medio_pago: medioPago }));
+    setAccion(null);
+    onPagada();
+  }
+
+  async function guardarDireccion() {
+    setGuardandoDir(true);
+    const { error: err } = await supabase
+      .from('ventas')
+      .update({ direccion_envio: direccion.trim() || null })
+      .eq('id', venta.id);
+    setGuardandoDir(false);
+    if (err) return toast(err.message, 'error');
+    toast('Dirección guardada.');
+    setVenta((v) => ({ ...v, direccion_envio: direccion.trim() || null }));
+  }
+
+  const telDigits = venta.contacto_telefono?.replace(/\D/g, '');
+
   return (
     <Modal title={`Venta #${venta.numero}`} onClose={onClose} wide>
       <div className="detail-grid">
         <div><span className="text-muted">Fecha</span><br />{fmtDate(venta.fecha, true)}</div>
-        <div><span className="text-muted">Cliente</span><br />{venta.cliente?.nombre ?? 'Consumidor final'}</div>
+        <div>
+          <span className="text-muted">Estado</span><br />
+          {estadoTag(venta.estado)}
+        </div>
+        <div><span className="text-muted">Origen</span><br />{origenTag(venta.origen)}</div>
         <div><span className="text-muted">Pago</span><br />{medioPagoLabel(venta.medio_pago)}</div>
-        <div><span className="text-muted">Estado</span><br />{venta.anulada ? 'Anulada' : 'Registrada'}</div>
+        {(venta.cliente?.nombre || venta.contacto_nombre) && (
+          <div>
+            <span className="text-muted">Cliente</span><br />
+            {venta.cliente?.nombre ?? venta.contacto_nombre}
+          </div>
+        )}
+        {venta.contacto_telefono && (
+          <div>
+            <span className="text-muted">Teléfono</span><br />
+            <a href={`https://wa.me/${telDigits}`} target="_blank" rel="noopener noreferrer">
+              {venta.contacto_telefono}
+            </a>
+          </div>
+        )}
         {venta.notas && <div className="span-2"><span className="text-muted">Notas</span><br />{venta.notas}</div>}
       </div>
+
+      {/* Dirección de envío */}
+      {venta.estado !== 'cancelada' && (
+        <div className="detail-dir">
+          <label className="text-muted" style={{ fontSize: 13 }}>Dirección de envío</label>
+          <div className="detail-dir-row">
+            <input
+              className="input"
+              value={direccion}
+              onChange={(e) => setDireccion(e.target.value)}
+              placeholder="Opcional"
+            />
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={guardarDireccion}
+              disabled={guardandoDir || direccion === (venta.direccion_envio ?? '')}
+            >
+              {guardandoDir ? '…' : 'Guardar'}
+            </button>
+          </div>
+        </div>
+      )}
+      {venta.estado === 'cancelada' && venta.direccion_envio && (
+        <div className="detail-dir"><span className="text-muted" style={{ fontSize: 13 }}>Dirección de envío</span><br />{venta.direccion_envio}</div>
+      )}
+
       <ErrorBox error={error} />
       {!items && !error && <Spinner />}
       {items && (
@@ -375,10 +594,34 @@ function DetalleVenta({ venta, onClose, onCancel }) {
           </table>
         </div>
       )}
+
+      {/* Panel de acción inline para marcar pagado */}
+      {accion === 'pagar' && (
+        <div className="detail-pagar">
+          <label className="text-muted" style={{ fontSize: 13 }}>Medio de pago</label>
+          <div className="detail-dir-row">
+            <select className="input" value={medioPago} onChange={(e) => setMedioPago(e.target.value)}>
+              {MEDIOS_PAGO.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+            </select>
+            <button type="button" className="btn btn-primary btn-sm" onClick={marcarPagado} disabled={busy}>
+              {busy ? '…' : 'Confirmar'}
+            </button>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setAccion(null)} disabled={busy}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="dialog-actions">
-        {!venta.anulada && (
+        {venta.estado === 'pendiente' && accion !== 'pagar' && (
+          <button type="button" className="btn btn-primary" onClick={() => setAccion('pagar')}>
+            <Check size={15} /> Marcar como pagado
+          </button>
+        )}
+        {venta.estado !== 'cancelada' && (
           <button type="button" className="btn btn-danger" onClick={onCancel}>
-            <Ban size={15} /> Anular venta
+            <Ban size={15} /> {venta.estado === 'pendiente' ? 'Cancelar pedido' : 'Cancelar venta'}
           </button>
         )}
         <button type="button" className="btn btn-secondary" onClick={onClose}>Cerrar</button>
@@ -390,4 +633,3 @@ function DetalleVenta({ venta, onClose, onCancel }) {
 function round3(n) {
   return Math.round(n * 1000) / 1000;
 }
-

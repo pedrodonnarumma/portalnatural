@@ -43,7 +43,7 @@ export default function Reportes() {
       supabase
         .from('ventas')
         .select('id, numero, fecha, medio_pago, total, cliente:clientes(id, nombre), items:venta_items(nombre, cantidad, subtotal, producto_id, producto:productos(unidad))')
-        .eq('anulada', false)
+        .eq('estado', 'pagada')
         .gte('fecha', startOfDayISO(desde))
         .lte('fecha', endOfDayISO(hasta))
         .order('fecha'),

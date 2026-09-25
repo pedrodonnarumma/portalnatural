@@ -1,12 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, Link } from 'react-router-dom';
 import { ShoppingCart, Users, Package, Boxes, Megaphone, BarChart3, LogOut, Menu, X, ExternalLink } from 'lucide-react';
 import Brand from '../components/Brand.jsx';
 import { supabase } from '../lib/supabase.js';
 import { useAuth } from './AuthProvider.jsx';
 
-const links = [
-  { to: '/admin/ventas', label: 'Ventas', icon: ShoppingCart },
+const NAV_LINKS = [
+  { to: '/admin/ventas', label: 'Ventas', icon: ShoppingCart, badge: 'pendientes' },
   { to: '/admin/clientes', label: 'Clientes', icon: Users },
   { to: '/admin/articulos', label: 'Artículos', icon: Package },
   { to: '/admin/stock', label: 'Stock', icon: Boxes },
@@ -17,6 +17,15 @@ const links = [
 export default function Layout() {
   const { session } = useAuth();
   const [open, setOpen] = useState(false);
+  const [pendientesCount, setPendientesCount] = useState(0);
+
+  useEffect(() => {
+    supabase
+      .from('ventas')
+      .select('id', { count: 'exact', head: true })
+      .eq('estado', 'pendiente')
+      .then(({ count }) => setPendientesCount(count ?? 0));
+  }, []);
 
   return (
     <div className="admin">
@@ -28,12 +37,16 @@ export default function Layout() {
           </button>
         </div>
         <nav className="sidebar-nav" aria-label="Secciones">
-          {links.map(({ to, label, icon: Icon }) => (
-            <NavLink key={to} to={to} className={({ isActive }) => `sidebar-link ${isActive ? 'is-active' : ''}`} onClick={() => setOpen(false)}>
-              <Icon size={18} aria-hidden="true" />
-              <span>{label}</span>
-            </NavLink>
-          ))}
+          {NAV_LINKS.map(({ to, label, icon: Icon, badge }) => {
+            const count = badge === 'pendientes' ? pendientesCount : 0;
+            return (
+              <NavLink key={to} to={to} className={({ isActive }) => `sidebar-link ${isActive ? 'is-active' : ''}`} onClick={() => setOpen(false)}>
+                <Icon size={18} aria-hidden="true" />
+                <span>{label}</span>
+                {count > 0 && <span className="sidebar-badge">{count}</span>}
+              </NavLink>
+            );
+          })}
         </nav>
         <div className="sidebar-foot">
           <a href="/" className="sidebar-link" target="_blank" rel="noreferrer">
