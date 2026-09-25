@@ -596,7 +596,10 @@ grant select on public.precios_promo_vigentes to authenticated;
 --    costo ni stock.
 --    precio      = precio de lista (siempre el precio base del producto)
 --    precio_promo = precio promocional vigente, NULL si no hay promo activa
-create or replace view public.catalogo_publico as
+--    Nota: usamos drop + create (no create or replace) porque PostgreSQL no
+--    permite reemplazar una vista si se eliminan columnas de la definición anterior.
+drop view if exists public.catalogo_publico;
+create view public.catalogo_publico as
   select
     p.id,
     p.nombre,
@@ -608,8 +611,8 @@ create or replace view public.catalogo_publico as
     p.imagen_url,
     p.descripcion,
     p.destacado,
-    p.precio              as precio,       -- precio de lista (siempre)
-    ppv.precio_promo      as precio_promo  -- precio promo, NULL si no hay
+    p.precio              as precio,
+    ppv.precio_promo      as precio_promo
   from public.productos p
   left join public.precios_promo_vigentes ppv on ppv.producto_id = p.id
   left join public.categorias c on c.id = p.categoria_id
@@ -908,6 +911,39 @@ language sql security invoker stable as $$
 $$;
 revoke all on function public.top_clientes(timestamptz, timestamptz, int) from public, anon;
 grant execute on function public.top_clientes(timestamptz, timestamptz, int) to authenticated;
+
+notify pgrst, 'reload schema';
+
+-- ════════════════════════════════════════════════════════════════
+-- HOTFIX catalogo_publico — corrige la vista en producción.
+-- El create or replace view anterior falló porque la definición
+-- vieja tenía precio_lista / en_promo (columnas eliminadas) y
+-- PostgreSQL no permite reemplazar quitando columnas. La vista
+-- quedó con la definición original. Solución: drop + create.
+-- Seguro correr en producción: sin pérdida de datos.
+-- ════════════════════════════════════════════════════════════════
+drop view if exists public.catalogo_publico;
+create view public.catalogo_publico as
+  select
+    p.id,
+    p.nombre,
+    p.categoria,
+    p.categoria_id,
+    c.orden               as categoria_orden,
+    p.unidad,
+    p.venta_por,
+    p.imagen_url,
+    p.descripcion,
+    p.destacado,
+    p.precio              as precio,
+    ppv.precio_promo      as precio_promo
+  from public.productos p
+  left join public.precios_promo_vigentes ppv on ppv.producto_id = p.id
+  left join public.categorias c on c.id = p.categoria_id
+  where p.activo = true;
+
+revoke all on public.catalogo_publico from anon, public;
+grant select on public.catalogo_publico to anon, authenticated;
 
 notify pgrst, 'reload schema';
 

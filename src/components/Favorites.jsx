@@ -20,13 +20,17 @@ export default function Favorites() {
       `${SB_URL}/rest/v1/catalogo_publico?destacado=eq.true&select=id,nombre,categoria,precio,precio_promo,unidad,venta_por,imagen_url,descripcion&order=nombre&limit=8`,
       { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } },
     )
-      .then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      .then(async (r) => {
+        if (!r.ok) {
+          const body = await r.json().catch(() => null);
+          console.error('[Portal Natural] catalogo_publico (destacados)', r.status, body);
+          throw new Error(`HTTP ${r.status}`);
+        }
         return r.json();
       })
       .then((data) => { if (Array.isArray(data) && data.length > 0) setItems(data); })
       .catch((err) => {
-        console.error('[Portal Natural] Error cargando destacados:', err);
+        console.error('[Portal Natural] Error cargando destacados:', err.message);
         if (!IS_DEV) setItems([]);
       });
   }, []);
