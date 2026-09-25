@@ -45,7 +45,7 @@ export default function Favorites() {
           const unidad = p.unidad ?? 'un';
           const tono = p.tono ?? TONOS[i % 2];
           const tonoMovil = p.tonoMovil ?? null;
-          const destino = `/catalogo?producto=${encodeURIComponent(p.id ?? p.nombre)}`;
+          const destino = '/catalogo';
 
           return (
             <Link

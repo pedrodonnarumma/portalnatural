@@ -12,8 +12,8 @@ export default function Hero() {
           Dietética de barrio
         </span>
         <h1 className="pn-hero-title">
-          Comer bien,<br />
-          <em>simple y natural</em>
+          Tu bienestar,<br />
+          <em>nuestra esencia.</em>
         </h1>
         <p className="pn-hero-lead">
           <span className="pn-d">Semillas, frutos secos, harinas, suplementos y productos sin TACC. Seleccionamos cada producto a granel y envasado para que tu alimentación sea más consciente.</span>

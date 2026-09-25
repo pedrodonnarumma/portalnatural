@@ -1,32 +1,26 @@
 import { useState } from 'react';
-import { sendContacto, validateContacto } from '../lib/contact.js';
+import { WhatsApp } from './icons.jsx';
+import { site } from '../data/site.js';
 
 export default function Contact() {
   const [value, setValue] = useState('');
-  const [status, setStatus] = useState('idle'); // idle | loading | sent | error
   const [error, setError] = useState(null);
+  const [sent, setSent] = useState(false);
 
-  async function handleSubmit(e) {
+  function handleSubmit(e) {
     e.preventDefault();
-    const invalid = validateContacto(value);
-    if (invalid) {
-      setError(invalid);
-      setStatus('error');
+    const texto = value.trim();
+    if (!texto) {
+      setError('Contanos qué estás buscando antes de enviar.');
       return;
     }
     setError(null);
-    setStatus('loading');
-    try {
-      await sendContacto(value);
-      setValue('');
-      setStatus('sent');
-    } catch {
-      setError('No pudimos enviar la consulta. Probá de nuevo en un rato.');
-      setStatus('error');
-    }
+    const msg = `¡Hola, Portal Natural! Quería consultar: ${texto}`;
+    window.open(`https://wa.me/${site.whatsapp}?text=${encodeURIComponent(msg)}`, '_blank', 'noopener');
+    setSent(true);
+    setValue('');
+    setTimeout(() => setSent(false), 4000);
   }
-
-  const label = status === 'loading' ? 'Enviando…' : status === 'sent' ? '¡Gracias! Te respondemos hoy' : 'Enviar consulta';
 
   return (
     <section id="contacto" className="pn-contact">
@@ -39,29 +33,26 @@ export default function Contact() {
           </p>
         </div>
         <form className="pn-contact-form" onSubmit={handleSubmit} noValidate>
-          <label htmlFor="pn-email">Tu correo o teléfono</label>
-          <input
-            id="pn-email"
-            className="pn-contact-input"
-            type="text"
-            inputMode="email"
-            autoComplete="email"
-            placeholder="hola@correo.com"
+          <label htmlFor="pn-consulta">¿Qué estás buscando?</label>
+          <textarea
+            id="pn-consulta"
+            className="pn-contact-input pn-contact-textarea"
+            placeholder="Ej.: harina de almendras, ¿tienen?"
             value={value}
+            rows={3}
             onChange={(e) => {
               setValue(e.target.value);
-              if (status === 'error' || status === 'sent') {
-                setStatus('idle');
-                setError(null);
-              }
+              if (error) setError(null);
+              if (sent) setSent(false);
             }}
             aria-invalid={!!error}
-            aria-describedby={error ? 'pn-email-error' : undefined}
-            required
+            aria-describedby={error ? 'pn-consulta-error' : undefined}
           />
-          {error && <p id="pn-email-error" className="pn-contact-error" role="alert">{error}</p>}
-          <button type="submit" className="pn-contact-submit" disabled={status === 'loading'} aria-live="polite">
-            {label}
+          {error && <p id="pn-consulta-error" className="pn-contact-error" role="alert">{error}</p>}
+          {sent && <p className="pn-contact-sent" role="status">¡Se abrió WhatsApp! Te respondemos hoy.</p>}
+          <button type="submit" className="pn-contact-submit pn-contact-submit-wa">
+            <WhatsApp size={18} strokeWidth={1.8} />
+            Consultar por WhatsApp
           </button>
         </form>
       </div>

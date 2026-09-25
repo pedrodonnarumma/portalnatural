@@ -1,16 +1,13 @@
-import PhotoFrame from './PhotoFrame.jsx';
 import { Check, SmallSprout } from './icons.jsx';
-import { fotos } from '../data/site.js';
 
 const puntos = ['Atención personalizada, sin apuro', 'Productos frescos con rotación semanal', 'Envases retornables y bolsas de papel'];
 
 export default function About() {
   return (
     <section id="nosotros" className="pn-about">
-      <PhotoFrame className="pn-about-photo" src={fotos.equipo} alt="El equipo de Portal Natural" label="[Foto del equipo]">
-        <span className="pn-d"><SmallSprout size={260} /></span>
-        <span className="pn-m"><SmallSprout size={120} leaves={1} /></span>
-      </PhotoFrame>
+      <div className="pn-about-illus pn-d" aria-hidden="true">
+        <SmallSprout size={240} strokeWidth={1.1} style={{ opacity: 0.28, color: 'var(--pn-sprout)' }} />
+      </div>
       <div className="pn-about-copy">
         <span className="pn-kicker">Sobre nosotros</span>
         <h2 className="pn-h2">
@@ -31,6 +28,9 @@ export default function About() {
             <li key={p}><Check size={18} />{p}</li>
           ))}
         </ul>
+        <div className="pn-about-illus-m pn-m" aria-hidden="true">
+          <SmallSprout size={96} strokeWidth={1.1} style={{ opacity: 0.28 }} />
+        </div>
       </div>
     </section>
   );

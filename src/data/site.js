@@ -1,4 +1,4 @@
-// Datos del local. TODO(cliente): completar lo que sigue entre corchetes.
+// Datos del local.
 export const site = {
   direccion: 'Azcuénaga 22',
   ciudad: 'Luján de Cuyo, Mendoza',
@@ -7,21 +7,20 @@ export const site = {
   horarioFinde: 'Sábados de 9.30 a 13.30 · Domingos cerrado',
   horarioSemanaCorto: 'Lun a vie 9.30–13.30 y 17–20.30',
   horarioFindeCorto: 'Sáb 9.30–13.30 · Dom cerrado',
-  telefono: '[Teléfono / WhatsApp]',
-  telefonoCorto: '[Teléfono]',
-  instagram: '[@instagram]',
-  // Número para los pedidos, solo dígitos con código de país (p. ej. '5492611234567').
-  // Vacío: WhatsApp se abre con el mensaje listo y la persona elige el contacto.
-  whatsapp: '',
+  telefono: '+54 9 2616 62-2682',
+  telefonoCorto: '+54 9 2616 62-2682',
+  instagram: '@_portal_natural',
+  instagramUrl: 'https://www.instagram.com/_portal_natural/',
+  // Número para los pedidos, solo dígitos con código de país.
+  whatsapp: '5492616622682',
   // URL de embed de Google Maps (iframe src). Vacío: se muestra el mapa ilustrado del diseño.
-  mapaEmbed: '',
+  mapaEmbed: 'https://www.google.com/maps?q=Azcu%C3%A9naga+22%2C+Luj%C3%A1n+de+Cuyo%2C+Mendoza&output=embed',
   anio: new Date().getFullYear(),
 };
 
 // Fotos provistas por el cliente (en /public). Vacío: se muestra el placeholder ilustrado del diseño.
 export const fotos = {
   local: '',
-  equipo: '',
 };
 
 // Si es false, todos los precios muestran "Consultá el precio".

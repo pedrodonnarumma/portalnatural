@@ -5,7 +5,6 @@ import { Close, Menu } from './icons.jsx';
 
 const LANDING_LINKS = [
   { href: '#nosotros', label: 'Nosotros' },
-  { href: '#catalogo', label: 'Catálogo' },
   { href: '#ubicacion', label: 'Ubicación' },
   { href: '#contacto', label: 'Contacto' },
 ];

@@ -1,6 +1,8 @@
 import { Clock, MapPin, Phone } from './icons.jsx';
 import { site } from '../data/site.js';
 
+const COMO_LLEGAR = 'https://www.google.com/maps/dir/?api=1&destination=Azcu%C3%A9naga+22%2C+Luj%C3%A1n+de+Cuyo%2C+Mendoza';
+
 function MapDesktop() {
   return (
     <svg className="pn-map-svg pn-d" viewBox="0 0 660 440" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
@@ -40,11 +42,18 @@ function MapMobile() {
 }
 
 export default function Location() {
+  const waLink = `https://wa.me/${site.whatsapp}`;
+
   return (
     <section id="ubicacion" className="pn-location">
       <div className="pn-map">
         {site.mapaEmbed ? (
-          <iframe src={site.mapaEmbed} title="Mapa de Portal Natural" loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
+          <iframe
+            src={site.mapaEmbed}
+            title="Mapa de Portal Natural"
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+          />
         ) : (
           <>
             <MapDesktop />
@@ -52,6 +61,14 @@ export default function Location() {
             <span className="pn-frame-label">Mapa de referencia</span>
           </>
         )}
+        <a
+          className="pn-map-directions"
+          href={COMO_LLEGAR}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Cómo llegar
+        </a>
       </div>
       <div className="pn-location-copy">
         <span className="pn-kicker">Ubicación</span>
@@ -81,7 +98,9 @@ export default function Location() {
           <li className="pn-d">
             <Phone className="pn-info-icon" />
             <div>
-              <span className="pn-info-title">{site.telefono}</span>
+              <a className="pn-info-title pn-info-link" href={waLink} target="_blank" rel="noopener noreferrer">
+                {site.telefono}
+              </a>
               <span className="pn-info-sub">También tomamos pedidos por mensaje</span>
             </div>
           </li>
