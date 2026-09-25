@@ -81,7 +81,7 @@ function dayDate(dateStr) {
 }
 
 /* ── Hoja Resumen ── */
-function addResumen(wb, { titulo, desde, hasta, filtros, ventas, userEmail }) {
+function addResumen(wb, { titulo, desde, hasta, filtros, kpis, userEmail }) {
   const ws = wb.addWorksheet('Resumen');
   ws.views = [{ showGridLines: false }];
   ws.getColumn(1).width = 2;
@@ -116,27 +116,20 @@ function addResumen(wb, { titulo, desde, hasta, filtros, ventas, userEmail }) {
   }
   r++;
 
-  // KPIs
-  const pagadas   = ventas.filter((v) => v.estado === 'pagada');
-  const pend      = ventas.filter((v) => v.estado === 'pendiente');
-  const canc      = ventas.filter((v) => v.estado === 'cancelada');
-  const totPag    = pagadas.reduce((a, v) => a + Number(v.total), 0);
-  const totPend   = pend.reduce((a, v)    => a + Number(v.total), 0);
-
+  // KPIs (recibidos como objeto)
   applyHeader(ws.getCell(r, 2)); ws.getCell(r, 2).value = 'Indicador';
   applyHeader(ws.getCell(r, 3)); ws.getCell(r, 3).value = 'Valor';
   r++;
 
-  const kpis = [
-    ['Período',                       `${fmtD(desde)} – ${fmtD(hasta)}`,                   null      ],
-    ['Facturación total (pagadas)',    totPag,                                                MONEY_FMT ],
-    ['Ventas pagadas',                 pagadas.length,                                        null      ],
-    ['Ticket promedio',                pagadas.length ? totPag / pagadas.length : 0,          MONEY_FMT ],
-    ['Pendientes (cantidad)',           pend.length,                                           null      ],
-    ['Pendientes ($)',                  totPend,                                               MONEY_FMT ],
-    ['Canceladas (cantidad)',           canc.length,                                           null      ],
+  const rows = [
+    ['Período',                    `${fmtD(desde)} – ${fmtD(hasta)}`,  null      ],
+    ['Facturación total (pagadas)', kpis.totVendido,                     MONEY_FMT ],
+    ['Ventas pagadas',              kpis.cantPagadas,                    null      ],
+    ['Ticket promedio',             kpis.ticketPromedio,                 MONEY_FMT ],
+    ['Pendientes (cantidad)',        kpis.cantPendientes,                 null      ],
+    ['Canceladas (cantidad)',        kpis.cantCanceladas,                 null      ],
   ];
-  for (const [label, val, fmt] of kpis) {
+  for (const [label, val, fmt] of rows) {
     ws.getCell(r, 2).value = label; ws.getCell(r, 2).font = fnt();
     ws.getCell(r, 3).value = val;   ws.getCell(r, 3).font = fnt();
     if (fmt) ws.getCell(r, 3).numFmt = fmt;
@@ -410,7 +403,19 @@ export async function exportarVentas({ ventas, filtros, opciones }) {
 
   const { desde, hasta, conDetalle, userEmail, filtrosCatProd } = opciones;
 
-  addResumen(wb, { titulo: 'Exportación de Ventas', desde, hasta, filtros, ventas, userEmail });
+  const pagadas = ventas.filter((v) => v.estado === 'pagada');
+  const pend    = ventas.filter((v) => v.estado === 'pendiente');
+  const canc    = ventas.filter((v) => v.estado === 'cancelada');
+  const totVend = pagadas.reduce((a, v) => a + Number(v.total), 0);
+  const kpis = {
+    totVendido:     totVend,
+    cantPagadas:    pagadas.length,
+    ticketPromedio: pagadas.length ? totVend / pagadas.length : 0,
+    cantPendientes: pend.length,
+    cantCanceladas: canc.length,
+  };
+
+  addResumen(wb, { titulo: 'Exportación de Ventas', desde, hasta, filtros, kpis, userEmail });
   addHojaVentas(wb, ventas);
   if (conDetalle) addHojaDetalle(wb, ventas, filtrosCatProd);
 
@@ -418,23 +423,28 @@ export async function exportarVentas({ ventas, filtros, opciones }) {
   descargar(buf, `portal-natural_ventas_${desde}_a_${hasta}.xlsx`);
 }
 
-export async function exportarReportes({ ventas, lowStock, filtros, opciones }) {
+export async function exportarReportes({ lowStock, filtros, opciones }) {
   const ExcelJS = (await import('exceljs')).default;
   const wb = new ExcelJS.Workbook();
   wb.creator = 'Portal Natural';
   wb.created = new Date();
 
-  const { desde, hasta, userEmail, hojas } = opciones;
+  const { desde, hasta, userEmail, hojas, sqlStats } = opciones;
+  const { resumen, porDia, topProductos, medios, topClientes } = sqlStats;
 
-  // Stats solo de ventas pagadas
-  const pagadas = ventas.filter((v) => v.estado === 'pagada');
-  const stats   = computarStats(pagadas, desde, hasta);
+  const kpis = {
+    totVendido:     resumen.total_vendido,
+    cantPagadas:    resumen.cant_pagadas,
+    ticketPromedio: resumen.ticket_promedio,
+    cantPendientes: resumen.cant_pendientes,
+    cantCanceladas: resumen.cant_canceladas,
+  };
 
-  addResumen(wb, { titulo: 'Reportes', desde, hasta, filtros, ventas, userEmail });
-  if (hojas.includes('dia'))       addHojaPorDia(wb, stats.porDia);
-  if (hojas.includes('productos')) addHojaProductos(wb, stats.topProductos);
-  if (hojas.includes('medios'))    addHojaMedios(wb, stats.medios, stats.total);
-  if (hojas.includes('clientes'))  addHojaClientes(wb, stats.topClientes);
+  addResumen(wb, { titulo: 'Reportes', desde, hasta, filtros, kpis, userEmail });
+  if (hojas.includes('dia'))       addHojaPorDia(wb, porDia);
+  if (hojas.includes('productos')) addHojaProductos(wb, topProductos);
+  if (hojas.includes('medios'))    addHojaMedios(wb, medios, resumen.total_vendido);
+  if (hojas.includes('clientes'))  addHojaClientes(wb, topClientes);
   if (hojas.includes('stock'))     addHojaStockBajo(wb, lowStock);
 
   const buf = await wb.xlsx.writeBuffer();

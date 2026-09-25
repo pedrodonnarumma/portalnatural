@@ -571,3 +571,342 @@ end $$;
 
 -- Indicar a PostgREST que recargue el schema
 notify pgrst, 'reload schema';
+
+-- ════════════════════════════════════════════════════════════════
+-- FASE 1A — Mejoras de seguridad y funciones de agregación.
+-- Seguro ejecutar ANTES del deploy de frontend.
+-- ════════════════════════════════════════════════════════════════
+
+-- 1. Fix timezone en precios_promo_vigentes (current_date usaba UTC)
+create or replace view public.precios_promo_vigentes as
+  select pi.producto_id, min(pi.precio_promo) as precio_promo
+  from public.promocion_items pi
+  join public.promociones p on p.id = pi.promocion_id
+  where p.activa
+    and p.fecha_inicio <= (now() AT TIME ZONE 'America/Argentina/Mendoza')::date
+    and (p.fecha_fin is null or p.fecha_fin >= (now() AT TIME ZONE 'America/Argentina/Mendoza')::date)
+  group by pi.producto_id;
+
+-- Solo authenticated accede directamente a la vista de precios
+revoke all on public.precios_promo_vigentes from anon, public;
+grant select on public.precios_promo_vigentes to authenticated;
+
+-- 2. Vista pública del catálogo: reemplaza acceso directo anon a productos.
+--    Corre como owner (security_invoker=false, default PostgreSQL) → no expone
+--    costo ni stock. El precio ya incorpora la promo vigente.
+create or replace view public.catalogo_publico as
+  select
+    p.id,
+    p.nombre,
+    p.categoria,
+    p.categoria_id,
+    p.unidad,
+    p.venta_por,
+    p.imagen_url,
+    p.descripcion,
+    p.destacado,
+    coalesce(ppv.precio_promo, p.precio) as precio,
+    p.precio                             as precio_lista,
+    ppv.precio_promo is not null         as en_promo
+  from public.productos p
+  left join public.precios_promo_vigentes ppv on ppv.producto_id = p.id
+  where p.activo = true;
+
+-- Acceso público a la vista del catálogo (anon y authenticated)
+revoke all on public.catalogo_publico from anon, public;
+grant select on public.catalogo_publico to anon, authenticated;
+
+-- 3. Trigger: sincroniza productos.categoria cuando la categoría cambia de nombre o se borra
+create or replace function public.sync_categoria_nombre()
+returns trigger language plpgsql security invoker as $$
+begin
+  if TG_OP = 'UPDATE' and OLD.nombre is distinct from NEW.nombre then
+    update public.productos set categoria = NEW.nombre where categoria = OLD.nombre;
+  elsif TG_OP = 'DELETE' then
+    update public.productos set categoria = null where categoria_id = OLD.id;
+    return OLD;
+  end if;
+  return NEW;
+end $$;
+
+drop trigger if exists sync_categoria_nombre_trg on public.categorias;
+create trigger sync_categoria_nombre_trg
+  after update or delete on public.categorias
+  for each row execute function public.sync_categoria_nombre();
+
+-- 4. Snapshot histórico del costo unitario en venta_items
+alter table public.venta_items add column if not exists costo_unitario numeric(12,2);
+
+-- 5. Drop y recrear registrar_venta con snapshot de costo_unitario
+drop function if exists public.registrar_venta(jsonb, uuid, text, text, text, text);
+
+create or replace function public.registrar_venta(
+  p_items           jsonb,
+  p_cliente_id      uuid    default null,
+  p_medio_pago      text    default 'efectivo',
+  p_notas           text    default null,
+  p_estado          text    default 'pagada',
+  p_direccion_envio text    default null
+) returns uuid
+language plpgsql security invoker as $$
+declare
+  v_venta_id uuid;
+  v_item     jsonb;
+  v_prod     public.productos%rowtype;
+  v_cant     numeric;
+  v_precio   numeric;
+  v_total    numeric := 0;
+begin
+  if p_items is null or jsonb_array_length(p_items) = 0 then
+    raise exception 'La venta no tiene ítems';
+  end if;
+  if p_estado not in ('pendiente','pagada','cancelada') then
+    raise exception 'Estado inválido: %', p_estado;
+  end if;
+
+  insert into public.ventas (cliente_id, medio_pago, notas, estado, origen, direccion_envio, pagada_at)
+  values (
+    p_cliente_id,
+    coalesce(p_medio_pago, 'efectivo'),
+    p_notas,
+    p_estado,
+    'local',
+    p_direccion_envio,
+    case when p_estado = 'pagada' then now() else null end
+  )
+  returning id into v_venta_id;
+
+  for v_item in select * from jsonb_array_elements(p_items) loop
+    select * into v_prod from public.productos where id = (v_item->>'producto_id')::uuid for update;
+    if not found then raise exception 'Producto inexistente'; end if;
+
+    v_cant   := (v_item->>'cantidad')::numeric;
+    v_precio := coalesce((v_item->>'precio_unitario')::numeric, v_prod.precio);
+    if v_cant is null or v_cant <= 0 then raise exception 'Cantidad inválida para %', v_prod.nombre; end if;
+
+    insert into public.venta_items (venta_id, producto_id, nombre, cantidad, precio_unitario, costo_unitario, subtotal)
+    values (v_venta_id, v_prod.id, v_prod.nombre, v_cant, v_precio, v_prod.costo, round(v_cant * v_precio, 2));
+
+    update public.productos set stock = stock - v_cant where id = v_prod.id;
+    insert into public.movimientos_stock (producto_id, tipo, cantidad, motivo, venta_id)
+    values (v_prod.id, 'venta', -v_cant, 'Venta', v_venta_id);
+
+    v_total := v_total + round(v_cant * v_precio, 2);
+  end loop;
+
+  update public.ventas set total = v_total where id = v_venta_id;
+  return v_venta_id;
+end $$;
+
+-- 6. Drop y recrear crear_pedido_web con precio promocional y snapshot de costo_unitario
+drop function if exists public.crear_pedido_web(jsonb, text, text);
+
+create or replace function public.crear_pedido_web(
+  p_items     jsonb,
+  p_nombre    text,
+  p_telefono  text
+) returns table(id uuid, numero bigint, total numeric)
+language plpgsql security definer
+set search_path = public
+as $$
+declare
+  v_venta_id   uuid;
+  v_numero     bigint;
+  v_item       jsonb;
+  v_prod       public.productos%rowtype;
+  v_cant       numeric;
+  v_precio     numeric;
+  v_total      numeric := 0;
+  v_cliente_id uuid;
+  v_tel_digits text;
+begin
+  if p_nombre is null or length(trim(p_nombre)) < 2 or length(trim(p_nombre)) > 80 then
+    raise exception 'El nombre debe tener entre 2 y 80 caracteres';
+  end if;
+
+  v_tel_digits := regexp_replace(coalesce(p_telefono,''), '\D', '', 'g');
+  if length(v_tel_digits) < 8 or length(v_tel_digits) > 20 then
+    raise exception 'El teléfono debe tener entre 8 y 20 dígitos';
+  end if;
+
+  if p_items is null or jsonb_array_length(p_items) = 0 then
+    raise exception 'El pedido no tiene ítems';
+  end if;
+  if jsonb_array_length(p_items) > 50 then
+    raise exception 'Máximo 50 ítems por pedido';
+  end if;
+
+  select c.id into v_cliente_id
+  from public.clientes c
+  where regexp_replace(coalesce(c.telefono,''), '\D', '', 'g') = v_tel_digits
+  limit 1;
+
+  insert into public.ventas (cliente_id, medio_pago, estado, origen, contacto_nombre, contacto_telefono)
+  values (v_cliente_id, 'efectivo', 'pendiente', 'web', trim(p_nombre), p_telefono)
+  returning ventas.id, ventas.numero into v_venta_id, v_numero;
+
+  for v_item in select * from jsonb_array_elements(p_items) loop
+    select * into v_prod
+    from public.productos
+    where productos.id = (v_item->>'producto_id')::uuid and activo = true
+    for update;
+
+    if not found then
+      raise exception 'Producto inexistente o inactivo';
+    end if;
+
+    v_cant := (v_item->>'cantidad')::numeric;
+    if v_cant is null or v_cant <= 0 then
+      raise exception 'Cantidad inválida para %', v_prod.nombre;
+    end if;
+
+    if abs(mod(v_cant, v_prod.venta_por)) > 0.0001 then
+      raise exception 'Cantidad de % debe ser múltiplo de %', v_prod.nombre, v_prod.venta_por;
+    end if;
+
+    -- Precio efectivo: usa promo si existe, sino precio de lista
+    select coalesce(min(ppv.precio_promo), v_prod.precio) into v_precio
+    from public.precios_promo_vigentes ppv
+    where ppv.producto_id = v_prod.id;
+    if v_precio is null then v_precio := v_prod.precio; end if;
+
+    insert into public.venta_items (venta_id, producto_id, nombre, cantidad, precio_unitario, costo_unitario, subtotal)
+    values (v_venta_id, v_prod.id, v_prod.nombre, v_cant, v_precio, v_prod.costo, round(v_cant * v_precio, 2));
+
+    update public.productos set stock = stock - v_cant where productos.id = v_prod.id;
+    insert into public.movimientos_stock (producto_id, tipo, cantidad, motivo, venta_id)
+    values (v_prod.id, 'venta', -v_cant, 'Pedido web', v_venta_id);
+
+    v_total := v_total + round(v_cant * v_precio, 2);
+  end loop;
+
+  update public.ventas set total = v_total where ventas.id = v_venta_id;
+  return query select v_venta_id, v_numero, v_total;
+end $$;
+
+grant execute on function public.crear_pedido_web(jsonb, text, text) to anon;
+
+-- 7. Funciones de agregación (security invoker, solo authenticated)
+
+drop function if exists public.resumen_ventas(timestamptz, timestamptz);
+create or replace function public.resumen_ventas(
+  desde timestamptz,
+  hasta timestamptz
+) returns table(
+  total_vendido   numeric,
+  cant_pagadas    bigint,
+  cant_pendientes bigint,
+  cant_canceladas bigint,
+  ticket_promedio numeric
+)
+language sql security invoker stable as $$
+  select
+    coalesce(sum(total) filter (where estado = 'pagada'), 0),
+    count(*) filter (where estado = 'pagada'),
+    count(*) filter (where estado = 'pendiente'),
+    count(*) filter (where estado = 'cancelada'),
+    case when count(*) filter (where estado = 'pagada') > 0
+      then sum(total) filter (where estado = 'pagada') / count(*) filter (where estado = 'pagada')
+      else 0
+    end
+  from public.ventas
+  where fecha >= desde and fecha <= hasta;
+$$;
+revoke all on function public.resumen_ventas(timestamptz, timestamptz) from public, anon;
+grant execute on function public.resumen_ventas(timestamptz, timestamptz) to authenticated;
+
+drop function if exists public.ventas_por_dia(timestamptz, timestamptz);
+create or replace function public.ventas_por_dia(
+  desde timestamptz,
+  hasta timestamptz
+) returns table(fecha date, monto numeric)
+language sql security invoker stable as $$
+  select
+    gs::date as fecha,
+    coalesce(sum(v.total), 0) as monto
+  from generate_series(
+    (desde AT TIME ZONE 'America/Argentina/Mendoza')::date,
+    (hasta AT TIME ZONE 'America/Argentina/Mendoza')::date,
+    '1 day'::interval
+  ) gs
+  left join public.ventas v
+    on (v.fecha AT TIME ZONE 'America/Argentina/Mendoza')::date = gs::date
+    and v.estado = 'pagada'
+    and v.fecha >= desde and v.fecha <= hasta
+  group by gs::date
+  order by gs::date;
+$$;
+revoke all on function public.ventas_por_dia(timestamptz, timestamptz) from public, anon;
+grant execute on function public.ventas_por_dia(timestamptz, timestamptz) to authenticated;
+
+drop function if exists public.top_productos(timestamptz, timestamptz, int);
+create or replace function public.top_productos(
+  desde  timestamptz,
+  hasta  timestamptz,
+  limite int default 10
+) returns table(nombre text, unidad text, cantidad numeric, total numeric)
+language sql security invoker stable as $$
+  select
+    vi.nombre,
+    p.unidad,
+    sum(vi.cantidad)  as cantidad,
+    sum(vi.subtotal)  as total
+  from public.venta_items vi
+  join public.ventas v on v.id = vi.venta_id
+  left join public.productos p on p.id = vi.producto_id
+  where v.estado = 'pagada'
+    and v.fecha >= desde and v.fecha <= hasta
+  group by vi.nombre, p.unidad
+  order by sum(vi.subtotal) desc
+  limit limite;
+$$;
+revoke all on function public.top_productos(timestamptz, timestamptz, int) from public, anon;
+grant execute on function public.top_productos(timestamptz, timestamptz, int) to authenticated;
+
+drop function if exists public.ventas_por_medio(timestamptz, timestamptz);
+create or replace function public.ventas_por_medio(
+  desde timestamptz,
+  hasta timestamptz
+) returns table(medio text, monto numeric, cant bigint)
+language sql security invoker stable as $$
+  select medio_pago as medio, sum(total) as monto, count(*) as cant
+  from public.ventas
+  where estado = 'pagada' and fecha >= desde and fecha <= hasta
+  group by medio_pago
+  order by sum(total) desc;
+$$;
+revoke all on function public.ventas_por_medio(timestamptz, timestamptz) from public, anon;
+grant execute on function public.ventas_por_medio(timestamptz, timestamptz) to authenticated;
+
+drop function if exists public.top_clientes(timestamptz, timestamptz, int);
+create or replace function public.top_clientes(
+  desde  timestamptz,
+  hasta  timestamptz,
+  limite int default 8
+) returns table(nombre text, compras bigint, total numeric)
+language sql security invoker stable as $$
+  select
+    coalesce(c.nombre, v.contacto_nombre) as nombre,
+    count(*)       as compras,
+    sum(v.total)   as total
+  from public.ventas v
+  left join public.clientes c on c.id = v.cliente_id
+  where v.estado = 'pagada'
+    and v.fecha >= desde and v.fecha <= hasta
+    and (v.cliente_id is not null or v.contacto_nombre is not null)
+  group by coalesce(c.nombre, v.contacto_nombre)
+  order by sum(v.total) desc
+  limit limite;
+$$;
+revoke all on function public.top_clientes(timestamptz, timestamptz, int) from public, anon;
+grant execute on function public.top_clientes(timestamptz, timestamptz, int) to authenticated;
+
+notify pgrst, 'reload schema';
+
+-- ════════════════════════════════════════════════════════════════
+-- FASE 1B — Ejecutar DESPUÉS del deploy de frontend.
+-- Elimina la policy que expone costo/stock al rol anon.
+-- El catálogo público ya usa catalogo_publico en lugar de productos.
+-- ════════════════════════════════════════════════════════════════
+-- drop policy if exists "public_read" on public.productos;
+-- notify pgrst, 'reload schema';

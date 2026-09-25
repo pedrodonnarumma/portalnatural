@@ -409,7 +409,7 @@ export default function Catalogo() {
   useEffect(() => {
     if (!SB_URL || !SB_KEY) return;
     fetch(
-      `${SB_URL}/rest/v1/productos?activo=eq.true&select=id,nombre,categoria,precio,unidad,venta_por,imagen_url,descripcion,destacado&order=nombre`,
+      `${SB_URL}/rest/v1/catalogo_publico?select=id,nombre,categoria,precio,precio_lista,en_promo,unidad,venta_por,imagen_url,descripcion,destacado&order=nombre`,
       { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } },
     )
       .then((r) => r.json())

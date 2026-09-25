@@ -16,7 +16,7 @@ export default function Favorites() {
   useEffect(() => {
     if (!SB_URL || !SB_KEY) return;
     fetch(
-      `${SB_URL}/rest/v1/productos?destacado=eq.true&activo=eq.true&select=id,nombre,categoria,precio,unidad,venta_por,imagen_url,descripcion&order=nombre&limit=8`,
+      `${SB_URL}/rest/v1/catalogo_publico?destacado=eq.true&select=id,nombre,categoria,precio,unidad,venta_por,imagen_url,descripcion&order=nombre&limit=8`,
       { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } },
     )
       .then((r) => r.json())

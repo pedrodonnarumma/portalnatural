@@ -184,6 +184,10 @@
 .pendientes-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
 .pendientes-title { font-size: 16px; font-weight: 600; color: var(--color-text); }
 
+/* — paginación — */
+.pagination { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 16px 0 8px; }
+.pagination-info { font-size: 13px; color: var(--color-muted); min-width: 60px; text-align: center; }
+
 /* — detalle dirección y marcar pagado — */
 .detail-dir { margin: 12px 0 4px; display: flex; flex-direction: column; gap: 6px; }
 .detail-dir-row { display: flex; gap: 8px; align-items: center; }

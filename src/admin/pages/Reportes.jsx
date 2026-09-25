@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, FileDown } from 'lucide-react';
 import { supabase } from '../../lib/supabase.js';
@@ -37,71 +37,41 @@ export default function Reportes() {
   const [desde, hasta] = preset === 'custom' ? custom : presetRange(preset);
   const [exportando, setExportando] = useState(false);
 
-  const [ventas, setVentas] = useState(null);
+  const [stats, setStats] = useState(null);
   const [lowStock, setLowStock] = useState([]);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     if (!desde || !hasta || desde > hasta) return;
-    setVentas(null);
+    setStats(null);
+    setError(null);
+    const desdeISO = startOfDayISO(desde);
+    const hastaISO = endOfDayISO(hasta);
+
     Promise.all([
-      supabase
-        .from('ventas')
-        .select('id, numero, fecha, medio_pago, total, cliente:clientes(id, nombre), items:venta_items(nombre, cantidad, subtotal, producto_id, producto:productos(unidad))')
-        .eq('estado', 'pagada')
-        .gte('fecha', startOfDayISO(desde))
-        .lte('fecha', endOfDayISO(hasta))
-        .order('fecha'),
+      supabase.rpc('resumen_ventas',   { desde: desdeISO, hasta: hastaISO }),
+      supabase.rpc('ventas_por_dia',   { desde: desdeISO, hasta: hastaISO }),
+      supabase.rpc('top_productos',    { desde: desdeISO, hasta: hastaISO }),
+      supabase.rpc('ventas_por_medio', { desde: desdeISO, hasta: hastaISO }),
+      supabase.rpc('top_clientes',     { desde: desdeISO, hasta: hastaISO }),
       supabase.from('productos').select('id, nombre, unidad, stock, stock_minimo').eq('activo', true),
-    ]).then(([v, p]) => {
-      if (v.error) return setError(v.error);
-      setVentas(v.data);
-      setLowStock((p.data ?? []).filter((x) => Number(x.stock) <= Number(x.stock_minimo)).sort((a, b) => a.stock - a.stock_minimo - (b.stock - b.stock_minimo)));
-    });
+    ]).then(([res, dias, prods, medios, clientes, ps]) => {
+      if (res.error) { setError(res.error); return; }
+      const r = res.data?.[0] ?? {};
+      const total = Number(r.total_vendido ?? 0);
+      const n     = Number(r.cant_pagadas ?? 0);
+      setStats({
+        total,
+        n,
+        ticket: Number(r.ticket_promedio ?? 0),
+        porDia: (dias.data ?? []).map((d) => ({ fecha: String(d.fecha).slice(0, 10), monto: Number(d.monto) })),
+        topProductos: (prods.data ?? []).map((p) => ({ ...p, cantidad: Number(p.cantidad), total: Number(p.total) })),
+        medios: (medios.data ?? []).map((m) => ({ ...m, monto: Number(m.monto) })),
+        topClientes: (clientes.data ?? []).map((c) => ({ ...c, n: Number(c.compras), total: Number(c.total) })),
+      });
+      setLowStock((ps.data ?? []).filter((x) => Number(x.stock) <= Number(x.stock_minimo)).sort((a, b) => (a.stock - a.stock_minimo) - (b.stock - b.stock_minimo)));
+    }).catch((e) => setError(e));
   }, [desde, hasta]);
-
-  const stats = useMemo(() => {
-    if (!ventas) return null;
-    const total = ventas.reduce((a, v) => a + Number(v.total), 0);
-    const n = ventas.length;
-
-    const porDia = new Map();
-    for (let d = new Date(startOfDayISO(desde)); d <= new Date(endOfDayISO(hasta)); d.setDate(d.getDate() + 1)) porDia.set(toDateInput(d), 0);
-    for (const v of ventas) {
-      const k = toDateInput(new Date(v.fecha));
-      porDia.set(k, (porDia.get(k) ?? 0) + Number(v.total));
-    }
-
-    const prod = new Map();
-    const medios = new Map();
-    const clientes = new Map();
-    for (const v of ventas) {
-      medios.set(v.medio_pago, (medios.get(v.medio_pago) ?? 0) + Number(v.total));
-      if (v.cliente) {
-        const c = clientes.get(v.cliente.id) ?? { nombre: v.cliente.nombre, total: 0, n: 0 };
-        c.total += Number(v.total);
-        c.n += 1;
-        clientes.set(v.cliente.id, c);
-      }
-      for (const it of v.items ?? []) {
-        const key = it.producto_id ?? it.nombre;
-        const p = prod.get(key) ?? { nombre: it.nombre, unidad: it.producto?.unidad, cantidad: 0, total: 0 };
-        p.cantidad += Number(it.cantidad);
-        p.total += Number(it.subtotal);
-        prod.set(key, p);
-      }
-    }
-    const sortDesc = (m) => [...m.values()].sort((a, b) => b.total - a.total);
-    return {
-      total,
-      n,
-      ticket: n ? total / n : 0,
-      porDia: [...porDia.entries()].map(([fecha, monto]) => ({ fecha, monto })),
-      topProductos: sortDesc(prod).slice(0, 10),
-      medios: [...medios.entries()].map(([medio, monto]) => ({ medio, monto })).sort((a, b) => b.monto - a.monto),
-      topClientes: sortDesc(clientes).slice(0, 8),
-    };
-  }, [ventas, desde, hasta]);
 
   return (
     <>

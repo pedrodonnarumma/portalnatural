@@ -169,53 +169,83 @@ export default function ExcelModal({ contexto, desdeInicial, hastaInicial, userE
     setGenerando(true);
     setError(null);
     try {
-      // Fetch completo con todos los campos
-      let q = supabase
-        .from('ventas')
-        .select('id, numero, fecha, estado, origen, medio_pago, total, notas, contacto_nombre, contacto_telefono, direccion_envio, cliente:clientes(id, nombre), items:venta_items(nombre, cantidad, precio_unitario, subtotal, producto_id, producto:productos(unidad, categoria))')
-        .gte('fecha', startOfDayISO(desde))
-        .lte('fecha', endOfDayISO(hasta))
-        .in('estado', estados)
-        .order('fecha');
-      if (medios.length > 0)  q = q.in('medio_pago', medios);
-      if (origen)             q = q.eq('origen', origen);
-      if (clienteId)          q = q.eq('cliente_id', clienteId);
-      const { data: ventas, error: errV } = await q;
-      if (errV) throw errV;
-
-      // Filtro client-side por categoría/producto
-      let filtradas = ventas ?? [];
-      if (selCats.length > 0 || selProds.length > 0) {
-        filtradas = filtradas.filter((v) => (v.items ?? []).some((it) => {
-          const cat = it.producto?.categoria ?? null;
-          const ok_cat  = selCats.length  === 0 || (cat  !== null && selCats.includes(cat));
-          const ok_prod = selProds.length === 0 || selProds.includes(it.producto_id);
-          return ok_cat && ok_prod;
-        }));
-      }
-
+      const desdeISO = startOfDayISO(desde);
+      const hastaISO = endOfDayISO(hasta);
       const filtros = buildFiltros({ desde, hasta, estados, medios, origen, clienteId, clienteList, selCats, selProds, prodList });
 
       if (contexto === 'ventas') {
+        // Fetch paginado en batches de 1000 (order estable: fecha + id)
+        const SEL = 'id, numero, fecha, estado, origen, medio_pago, total, notas, contacto_nombre, contacto_telefono, direccion_envio, cliente:clientes(id, nombre), items:venta_items(nombre, cantidad, precio_unitario, subtotal, producto_id, producto:productos(unidad, categoria))';
+        const BATCH = 1000;
+        let allVentas = [];
+        let from = 0;
+        while (true) {
+          let q = supabase
+            .from('ventas')
+            .select(SEL)
+            .gte('fecha', desdeISO)
+            .lte('fecha', hastaISO)
+            .in('estado', estados)
+            .order('fecha', { ascending: true })
+            .order('id',    { ascending: true })
+            .range(from, from + BATCH - 1);
+          if (medios.length > 0) q = q.in('medio_pago', medios);
+          if (origen)            q = q.eq('origen', origen);
+          if (clienteId)         q = q.eq('cliente_id', clienteId);
+          const { data, error: errV } = await q;
+          if (errV) throw errV;
+          allVentas = allVentas.concat(data ?? []);
+          if (!data || data.length < BATCH) break;
+          from += BATCH;
+        }
+
+        // Filtro client-side por categoría/producto
+        let filtradas = allVentas;
+        if (selCats.length > 0 || selProds.length > 0) {
+          filtradas = filtradas.filter((v) => (v.items ?? []).some((it) => {
+            const cat = it.producto?.categoria ?? null;
+            const ok_cat  = selCats.length  === 0 || (cat  !== null && selCats.includes(cat));
+            const ok_prod = selProds.length === 0 || selProds.includes(it.producto_id);
+            return ok_cat && ok_prod;
+          }));
+        }
+
         await exportarVentas({
           ventas: filtradas,
           filtros,
-          opciones: {
-            desde, hasta, conDetalle, userEmail,
-            filtrosCatProd: { cats: selCats, prods: selProds },
-          },
+          opciones: { desde, hasta, conDetalle, userEmail, filtrosCatProd: { cats: selCats, prods: selProds } },
         });
       } else {
-        // Para Reportes: fetch stock bajo al momento de exportar
-        const { data: ps } = await supabase
-          .from('productos')
-          .select('id, nombre, unidad, stock, stock_minimo')
-          .eq('activo', true);
-        const lowStock = (ps ?? [])
+        // Reportes: stats vía SQL, sin fetch masivo de ventas
+        const [resumenRes, diasRes, prodsRes, mediosRes, clientesRes, psRes] = await Promise.all([
+          supabase.rpc('resumen_ventas',   { desde: desdeISO, hasta: hastaISO }),
+          supabase.rpc('ventas_por_dia',   { desde: desdeISO, hasta: hastaISO }),
+          supabase.rpc('top_productos',    { desde: desdeISO, hasta: hastaISO }),
+          supabase.rpc('ventas_por_medio', { desde: desdeISO, hasta: hastaISO }),
+          supabase.rpc('top_clientes',     { desde: desdeISO, hasta: hastaISO }),
+          supabase.from('productos').select('id, nombre, unidad, stock, stock_minimo').eq('activo', true),
+        ]);
+        if (resumenRes.error) throw resumenRes.error;
+
+        const r = resumenRes.data?.[0] ?? {};
+        const sqlStats = {
+          resumen: {
+            total_vendido:   Number(r.total_vendido   ?? 0),
+            cant_pagadas:    Number(r.cant_pagadas    ?? 0),
+            cant_pendientes: Number(r.cant_pendientes ?? 0),
+            cant_canceladas: Number(r.cant_canceladas ?? 0),
+            ticket_promedio: Number(r.ticket_promedio ?? 0),
+          },
+          porDia:      (diasRes.data    ?? []).map((d) => ({ fecha: String(d.fecha).slice(0, 10), monto: Number(d.monto) })),
+          topProductos:(prodsRes.data   ?? []).map((p) => ({ ...p, cantidad: Number(p.cantidad), total: Number(p.total) })),
+          medios:      (mediosRes.data  ?? []).map((m) => ({ ...m, monto: Number(m.monto) })),
+          topClientes: (clientesRes.data ?? []).map((c) => ({ nombre: c.nombre, n: Number(c.compras), total: Number(c.total) })),
+        };
+        const lowStock = (psRes.data ?? [])
           .filter((x) => Number(x.stock) <= Number(x.stock_minimo))
           .sort((a, b) => (a.stock - a.stock_minimo) - (b.stock - b.stock_minimo));
 
-        await exportarReportes({ ventas: filtradas, lowStock, filtros, opciones: { desde, hasta, userEmail, hojas } });
+        await exportarReportes({ lowStock, filtros, opciones: { desde, hasta, userEmail, hojas, sqlStats } });
       }
 
       onClose();

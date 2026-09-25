@@ -434,6 +434,19 @@ function ArticuloForm({ initial, isNew, categorias, busy, onSave, onClose }) {
     setV((s) => ({ ...s, unidad: u, venta_por: String(opts[0].value) }));
   }
 
+  // Cuando cambia venta_por, recalcular el precio mostrado manteniendo el precio base.
+  function handleVentaPor(e) {
+    const newVp = Number(e.target.value) || 1;
+    const oldVp = Number(v.venta_por) || 1;
+    const displayed = Number(v.precio) || 0;
+    if (displayed > 0 && oldVp > 0) {
+      const base = displayed / oldVp;
+      setV((s) => ({ ...s, venta_por: String(newVp), precio: String(Math.round(base * newVp)) }));
+    } else {
+      setV((s) => ({ ...s, venta_por: String(newVp) }));
+    }
+  }
+
   const ventaPorOpts = VENTA_POR_OPTS[v.unidad] ?? [{ value: 1, label: 'unidad' }];
   const etiqPrecio = etiquetaPresentacion(v.unidad, Number(v.venta_por) || 1);
 
@@ -465,7 +478,7 @@ function ArticuloForm({ initial, isNew, categorias, busy, onSave, onClose }) {
           </select>
         </Field>
         <Field label="Se vende por">
-          <select className="input" value={v.venta_por} onChange={set('venta_por')}>
+          <select className="input" value={v.venta_por} onChange={handleVentaPor}>
             {ventaPorOpts.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </Field>

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, Trash2, Ban, Eye, Check, X, FileDown } from 'lucide-react';
+import { Plus, Trash2, Ban, Eye, Check, X, FileDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from '../../lib/supabase.js';
-import { fmtDate, fmtMoney, fmtQty, MEDIOS_PAGO, medioPagoLabel, startOfDayISO, toDateInput } from '../lib/format.js';
+import { endOfDayISO, fmtDate, fmtMoney, fmtQty, MEDIOS_PAGO, medioPagoLabel, startOfDayISO, toDateInput } from '../lib/format.js';
 import { etiquetaPresentacion, precioPresentacion } from '../../lib/precios.js';
 import { Confirm, EmptyState, ErrorBox, Field, Modal, PageHead, SearchBox, Spinner, useToast } from '../components/ui.jsx';
 import { useAuth } from '../AuthProvider.jsx';
@@ -14,12 +14,22 @@ const RANGOS = [
   { key: 'todo', label: 'Todas' },
 ];
 
+const PAGE_SIZE = 50;
+
 function rangeStart(key) {
   const d = new Date();
   if (key === 'hoy') return startOfDayISO(toDateInput(d));
   if (key === '7') { d.setDate(d.getDate() - 6); return startOfDayISO(toDateInput(d)); }
   if (key === '30') { d.setDate(d.getDate() - 29); return startOfDayISO(toDateInput(d)); }
   return null;
+}
+
+function rangeTimestamps(key) {
+  const hoy = toDateInput(new Date());
+  if (key === 'hoy') return [startOfDayISO(hoy), endOfDayISO(hoy)];
+  if (key === '7')  { const d = new Date(); d.setDate(d.getDate() - 6); return [startOfDayISO(toDateInput(d)), endOfDayISO(hoy)]; }
+  if (key === '30') { const d = new Date(); d.setDate(d.getDate() - 29); return [startOfDayISO(toDateInput(d)), endOfDayISO(hoy)]; }
+  return [startOfDayISO('2000-01-01'), endOfDayISO(hoy)];
 }
 
 const SELECT_VENTAS = 'id, numero, fecha, medio_pago, total, notas, anulada, estado, origen, contacto_nombre, contacto_telefono, direccion_envio, pagada_at, cancelada_at, cliente:clientes(id, nombre)';
@@ -49,37 +59,63 @@ export default function Ventas() {
   const toast = useToast();
   const [rows, setRows] = useState(null);
   const [pendientes, setPendientes] = useState(null);
+  const [masPendientes, setMasPendientes] = useState(false);
   const [error, setError] = useState(null);
   const [rango, setRango] = useState('7');
+  const [page, setPage] = useState(0);
+  const [serverCount, setServerCount] = useState(null);
+  const [resumen, setResumen] = useState(null);
   const [creating, setCreating] = useState(false);
   const [viewing, setViewing] = useState(null);
   const [cancelling, setCancelling] = useState(null);
   const [busy, setBusy] = useState(false);
   const [exportando, setExportando] = useState(false);
 
+  // Resetear página al cambiar rango
+  useEffect(() => { setPage(0); }, [rango]);
+
   const loadPendientes = useCallback(async () => {
-    const { data, error: err } = await supabase
+    const { data, error: err, count } = await supabase
       .from('ventas')
-      .select(SELECT_VENTAS)
+      .select(SELECT_VENTAS, { count: 'exact' })
       .eq('estado', 'pendiente')
       .order('fecha', { ascending: true })
-      .limit(100);
-    if (!err) setPendientes(data ?? []);
+      .limit(200);
+    if (!err) {
+      setPendientes(data ?? []);
+      setMasPendientes((count ?? 0) > 200);
+    }
   }, []);
 
   const load = useCallback(async () => {
-    let query = supabase
+    const from = rangeStart(rango);
+    const [desdeISO, hastaISO] = rangeTimestamps(rango);
+    const from_ = page * PAGE_SIZE;
+    const to_   = from_ + PAGE_SIZE - 1;
+
+    let q = supabase
       .from('ventas')
-      .select(SELECT_VENTAS)
+      .select(SELECT_VENTAS, { count: 'exact' })
       .neq('estado', 'pendiente')
       .order('fecha', { ascending: false })
-      .limit(300);
-    const from = rangeStart(rango);
-    if (from) query = query.gte('fecha', from);
-    const { data, error: err } = await query;
-    if (err) setError(err);
-    else setRows(data);
-  }, [rango]);
+      .order('id', { ascending: false })
+      .range(from_, to_);
+    if (from) q = q.gte('fecha', from);
+
+    const [pageRes, resumenRes] = await Promise.all([
+      q,
+      supabase.rpc('resumen_ventas', { desde: desdeISO, hasta: hastaISO }),
+    ]);
+
+    if (pageRes.error) setError(pageRes.error);
+    else {
+      setRows(pageRes.data ?? []);
+      setServerCount(pageRes.count ?? 0);
+    }
+    if (!resumenRes.error && resumenRes.data?.[0]) {
+      setResumen(resumenRes.data[0]);
+    }
+  }, [rango, page]);
 
   useEffect(() => {
     loadPendientes();
@@ -91,15 +127,6 @@ export default function Ventas() {
   }, [load]);
 
   const recargar = useCallback(() => { loadPendientes(); load(); }, [loadPendientes, load]);
-
-  const total = useMemo(
-    () => (rows ?? []).filter((v) => v.estado === 'pagada').reduce((a, v) => a + Number(v.total), 0),
-    [rows],
-  );
-  const totalPagadas = useMemo(
-    () => (rows ?? []).filter((v) => v.estado === 'pagada').length,
-    [rows],
-  );
 
   async function cancelarVenta(v) {
     setBusy(true);
@@ -116,7 +143,7 @@ export default function Ventas() {
     <>
       <PageHead
         title="Ventas"
-        subtitle={rows ? `${totalPagadas} pagadas · ${fmtMoney(total)}` : null}
+        subtitle={resumen ? `${resumen.cant_pagadas} pagadas · ${fmtMoney(resumen.total_vendido)}` : null}
         actions={
           <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
             <Plus size={16} /> Nueva venta
@@ -127,6 +154,7 @@ export default function Ventas() {
       {/* Bloque de pendientes — siempre visible, sin filtro de fecha */}
       <PendientesBloque
         pendientes={pendientes}
+        masPendientes={masPendientes}
         onVer={(v) => setViewing(v)}
         onMarcarPagado={(v) => setViewing({ ...v, _accion: 'pagar' })}
         onCancelar={(v) => setCancelling(v)}
@@ -185,6 +213,31 @@ export default function Ventas() {
           </table>
         </div>
       )}
+      {serverCount > PAGE_SIZE && (
+        <div className="pagination">
+          <button
+            type="button"
+            className="btn btn-icon btn-secondary"
+            onClick={() => setPage((p) => p - 1)}
+            disabled={page === 0}
+            aria-label="Página anterior"
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <span className="pagination-info">
+            {page + 1} / {Math.ceil(serverCount / PAGE_SIZE)}
+          </span>
+          <button
+            type="button"
+            className="btn btn-icon btn-secondary"
+            onClick={() => setPage((p) => p + 1)}
+            disabled={(page + 1) * PAGE_SIZE >= serverCount}
+            aria-label="Página siguiente"
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
+      )}
 
       {creating && (
         <NuevaVenta
@@ -233,14 +286,15 @@ export default function Ventas() {
 }
 
 /* ── Bloque pendientes ── */
-function PendientesBloque({ pendientes, onVer, onMarcarPagado, onCancelar }) {
+function PendientesBloque({ pendientes, masPendientes, onVer, onMarcarPagado, onCancelar }) {
   if (!pendientes || pendientes.length === 0) return null;
 
   return (
     <div className="pendientes-bloque">
       <div className="pendientes-head">
         <span className="pendientes-title">Pedidos pendientes</span>
-        <span className="chip chip-sm is-active">{pendientes.length}</span>
+        <span className="chip chip-sm is-active">{pendientes.length}{masPendientes ? '+' : ''}</span>
+        {masPendientes && <span className="text-muted" style={{ fontSize: 13 }}>Se muestran solo los primeros 200</span>}
       </div>
       <div className="table-wrap">
         <table className="table">
