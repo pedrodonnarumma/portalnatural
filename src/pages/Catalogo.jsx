@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import Nav from '../components/Nav.jsx';
 import { ArrowLeft, Bag, Close, Minus, Plus, ProductIcon, Search, WhatsApp } from '../components/icons.jsx';
 import { catalogo as catalogoStatic } from '../data/products.js';
 import { site, showPrices } from '../data/site.js';
 import { fmtPrecio, normalizar } from '../lib/format.js';
 import { etiquetaCantidad, etiquetaPresentacion, precioPresentacion, precioReferencia } from '../lib/precios.js';
-import { linkWhatsApp, mensajeWhatsApp, usePedido } from '../lib/pedido.js';
+import {
+  guardarContacto, leerContacto, linkWhatsApp,
+  mensajeWhatsApp, mensajeWhatsAppConfirmado, usePedido,
+} from '../lib/pedido.js';
 
 const SB_URL = import.meta.env.VITE_SUPABASE_URL;
 const SB_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -24,17 +27,14 @@ function registrarPopular(nombre) {
   } catch {}
 }
 
-function ProductCard({ p, i, pasos, onSumar, highlighted, cardRef }) {
+function ProductCard({ p, i, pasos, onSumar }) {
   const vp = p.venta_por ?? 1;
   const precioPublico = precioPresentacion(p.precio, vp);
   const etiqUnidad = etiquetaPresentacion(p.unidad, vp);
   const ref = precioReferencia(p.precio, p.unidad, vp);
 
   return (
-    <article
-      ref={cardRef}
-      className={`pn-card pn-product${highlighted ? ' pn-product-highlight' : ''}`}
-    >
+    <article className="pn-card pn-product">
       <div className={`pn-thumb pn-tone-${TONOS[i % 2]}`}>
         {(p.foto || p.imagen_url)
           ? <img src={p.foto ?? p.imagen_url} alt="" />
@@ -73,9 +73,243 @@ function ProductCard({ p, i, pasos, onSumar, highlighted, cardRef }) {
   );
 }
 
-function Pedido({ items, total, onQuitar, onClose }) {
+/* ─── Modal confirmar pedido ─── */
+function ConfirmarPedido({ items, total, catalogo, onClose, onConfirmado }) {
+  const contacto = leerContacto();
+  const [nombre, setNombre] = useState(contacto.nombre ?? '');
+  const [telefono, setTelefono] = useState(contacto.telefono ?? '');
+  const [errNombre, setErrNombre] = useState('');
+  const [errTel, setErrTel] = useState('');
+  const [estado, setEstado] = useState('idle'); // idle | enviando | exito | error
+  const [errEnvio, setErrEnvio] = useState('');
+  const [pedidoOk, setPedidoOk] = useState(null); // { numero, waHref }
+  const firstRef = useRef(null);
+  const waRef = useRef(null);
+
+  // Foco inicial y trap
+  useEffect(() => {
+    firstRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    if (estado === 'exito') {
+      waRef.current?.focus();
+    }
+  }, [estado]);
+
+  // Escape
+  useEffect(() => {
+    const onKey = (e) => e.key === 'Escape' && onClose();
+    document.addEventListener('keydown', onKey);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = '';
+    };
+  }, [onClose]);
+
+  // Trap de foco dentro del modal
+  const dialogRef = useRef(null);
+  function trapFocus(e) {
+    if (!dialogRef.current) return;
+    const focusables = dialogRef.current.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    );
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    if (e.key === 'Tab') {
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+      } else {
+        if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    }
+  }
+
+  function validate() {
+    let ok = true;
+    if (nombre.trim().length < 2 || nombre.trim().length > 80) {
+      setErrNombre('Ingresá tu nombre (entre 2 y 80 caracteres).');
+      ok = false;
+    } else setErrNombre('');
+    const digits = telefono.replace(/\D/g, '');
+    if (digits.length < 8 || digits.length > 20) {
+      setErrTel('Ingresá un teléfono válido (8–20 dígitos).');
+      ok = false;
+    } else setErrTel('');
+    return ok;
+  }
+
+  async function handleConfirmar(e) {
+    e.preventDefault();
+    if (!validate()) return;
+
+    guardarContacto(nombre.trim(), telefono.trim());
+    setEstado('enviando');
+    setErrEnvio('');
+
+    try {
+      const payload = {
+        p_nombre: nombre.trim(),
+        p_telefono: telefono.trim(),
+        p_items: items.map((it) => ({
+          producto_id: catalogo.find((p) => p.nombre === it.nombre)?.id,
+          cantidad: it.pasos * (it.venta_por ?? 1),
+        })).filter((x) => x.producto_id),
+      };
+
+      const res = await fetch(`${SB_URL}/rest/v1/rpc/crear_pedido_web`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: SB_KEY,
+          Authorization: `Bearer ${SB_KEY}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message || body.hint || `Error ${res.status}`);
+      }
+
+      const [row] = await res.json();
+      const waHref = linkWhatsApp(mensajeWhatsAppConfirmado(nombre.trim(), row.numero, items, row.total));
+
+      setPedidoOk({ numero: row.numero, waHref });
+      setEstado('exito');
+      onConfirmado(); // vacía el carrito
+
+      // Intento de apertura automática (puede ser bloqueado por el navegador)
+      try { window.open(waHref, '_blank', 'noopener'); } catch {}
+    } catch (err) {
+      setEstado('error');
+      setErrEnvio(err.message || 'No pudimos enviar el pedido. Revisá tu conexión y volvé a intentar.');
+    }
+  }
+
+  return (
+    <div
+      className="pn-modal-backdrop"
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div
+        ref={dialogRef}
+        className="pn-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Confirmá tu pedido"
+        onKeyDown={trapFocus}
+      >
+        <div className="pn-modal-head">
+          <h2 className="pn-modal-title">
+            {estado === 'exito' ? `¡Pedido #${pedidoOk.numero} confirmado!` : 'Confirmá tu pedido'}
+          </h2>
+          <button type="button" className="pn-x pn-modal-close" onClick={onClose} aria-label="Cerrar">
+            <Close size={20} />
+          </button>
+        </div>
+
+        {estado === 'exito' ? (
+          <div className="pn-modal-body pn-modal-exito">
+            <p className="pn-modal-exito-text">
+              Tu pedido quedó registrado. Envianos el detalle por WhatsApp para coordinar el retiro.
+            </p>
+            <a
+              ref={waRef}
+              href={pedidoOk.waHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="pn-cart-cta pn-modal-wa"
+            >
+              <WhatsApp size={18} strokeWidth={1.8} />
+              Enviar por WhatsApp
+            </a>
+            <button type="button" className="pn-btn pn-btn-ghost pn-btn-md pn-modal-cerrar" onClick={onClose}>
+              Cerrar
+            </button>
+          </div>
+        ) : (
+          <form className="pn-modal-body" onSubmit={handleConfirmar} noValidate>
+            {/* Resumen de ítems */}
+            <ul className="pn-modal-items">
+              {items.map((it) => {
+                const vp = it.venta_por ?? 1;
+                return (
+                  <li key={it.nombre} className="pn-modal-item">
+                    <span className="pn-modal-item-nombre">{it.nombre}</span>
+                    <span className="pn-modal-item-cant">{etiquetaCantidad(it.pasos, it.unidad, vp)}</span>
+                    <span className="pn-modal-item-sub">{fmtPrecio(it.subtotal)}</span>
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="pn-modal-total">
+              <span>Total estimado</span>
+              <strong>{fmtPrecio(total)}</strong>
+            </div>
+            <hr className="pn-modal-rule" />
+
+            {/* Datos de contacto */}
+            <div className="pn-modal-fields">
+              <div className="pn-modal-field">
+                <label htmlFor="pn-modal-nombre">Nombre</label>
+                <input
+                  ref={firstRef}
+                  id="pn-modal-nombre"
+                  className={`pn-modal-input${errNombre ? ' is-invalid' : ''}`}
+                  type="text"
+                  autoComplete="name"
+                  value={nombre}
+                  onChange={(e) => { setNombre(e.target.value); setErrNombre(''); }}
+                  aria-invalid={!!errNombre}
+                  aria-describedby={errNombre ? 'pn-modal-nombre-err' : undefined}
+                />
+                {errNombre && <p id="pn-modal-nombre-err" className="pn-modal-err" role="alert">{errNombre}</p>}
+              </div>
+              <div className="pn-modal-field">
+                <label htmlFor="pn-modal-tel">Teléfono</label>
+                <input
+                  id="pn-modal-tel"
+                  className={`pn-modal-input${errTel ? ' is-invalid' : ''}`}
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  value={telefono}
+                  onChange={(e) => { setTelefono(e.target.value); setErrTel(''); }}
+                  aria-invalid={!!errTel}
+                  aria-describedby={errTel ? 'pn-modal-tel-err' : undefined}
+                />
+                {errTel && <p id="pn-modal-tel-err" className="pn-modal-err" role="alert">{errTel}</p>}
+              </div>
+            </div>
+
+            <p className="pn-modal-nota">Precios de referencia: se confirman en el local.</p>
+
+            {errEnvio && <p className="pn-modal-err pn-modal-err-envio" role="alert">{errEnvio}</p>}
+
+            <div className="pn-modal-actions">
+              <button type="button" className="pn-btn pn-btn-ghost pn-btn-md" onClick={onClose} disabled={estado === 'enviando'}>
+                Volver
+              </button>
+              <button type="submit" className="pn-btn pn-btn-primary pn-btn-md" disabled={estado === 'enviando'}>
+                {estado === 'enviando' ? 'Confirmando…' : 'Confirmar pedido'}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Pedido({ items, total, catalogo, onQuitar, onClose, onHacerPedido }) {
   const lleno = items.length > 0;
-  const href = lleno ? linkWhatsApp(mensajeWhatsApp(items, total)) : undefined;
+  const usandoSB = Boolean(SB_URL && SB_KEY);
+
+  // Fallback: si no hay Supabase, abrir WhatsApp directo
+  const href = (!usandoSB && lleno) ? linkWhatsApp(mensajeWhatsApp(items, total)) : undefined;
+
   return (
     <>
       <div className="pn-cart-head">
@@ -122,36 +356,42 @@ function Pedido({ items, total, onQuitar, onClose }) {
           <span>Todavía no agregaste productos. Elegí uno del catálogo para empezar.</span>
         </div>
       )}
-      {lleno ? (
+      {lleno && usandoSB && (
+        <button type="button" className="pn-cart-cta" onClick={onHacerPedido}>
+          <WhatsApp size={18} strokeWidth={1.8} />
+          Hacer pedido
+        </button>
+      )}
+      {lleno && !usandoSB && (
         <a className="pn-cart-cta" href={href} target="_blank" rel="noopener noreferrer">
           <WhatsApp size={18} strokeWidth={1.8} />
           Hacer pedido
         </a>
-      ) : (
+      )}
+      {!lleno && (
         <button type="button" className="pn-cart-cta" disabled>
           <WhatsApp size={18} strokeWidth={1.8} />
           Hacer pedido
         </button>
       )}
-      <span className="pn-cart-note">Se abre WhatsApp con la lista lista para enviar. Precios de referencia: se confirman en el local.</span>
+      <span className="pn-cart-note">
+        {usandoSB
+          ? 'Confirmá el pedido y coordiná el retiro por WhatsApp. Precios de referencia: se confirman en el local.'
+          : 'Se abre WhatsApp con la lista lista para enviar. Precios de referencia: se confirman en el local.'}
+      </span>
     </>
   );
 }
 
 export default function Catalogo() {
-  const [searchParams] = useSearchParams();
-  const productoParam = searchParams.get('producto');
-
   const [cat, setCat] = useState('Todos');
   const [q, setQ] = useState('');
   const [orden, setOrden] = useState('');
   const [sheet, setSheet] = useState(false);
+  const [modal, setModal] = useState(false);
   const [catalogo, setCatalogo] = useState(catalogoStatic);
   const [cargando, setCargando] = useState(Boolean(SB_URL && SB_KEY));
-  const [highlighted, setHighlighted] = useState(null);
-  const { qty, sumar: sumarBase, quitar } = usePedido();
-  const cardRefs = useRef({});
-  const didHighlight = useRef(false);
+  const { qty, sumar: sumarBase, quitar, vaciar } = usePedido();
 
   const sumar = useCallback((nombre, delta) => {
     sumarBase(nombre, delta);
@@ -161,6 +401,9 @@ export default function Catalogo() {
   useEffect(() => {
     document.title = 'Catálogo — Portal Natural';
     window.scrollTo(0, 0);
+    if (!SB_URL || !SB_KEY) {
+      console.warn('[Portal Natural] Supabase no configurado: el pedido irá directo a WhatsApp.');
+    }
   }, []);
 
   useEffect(() => {
@@ -174,26 +417,6 @@ export default function Catalogo() {
       .catch(() => {})
       .finally(() => setCargando(false));
   }, []);
-
-  // Highlight del producto llegado desde la landing.
-  useEffect(() => {
-    if (!productoParam || cargando || didHighlight.current) return;
-    const prod = catalogo.find((p) => p.id === productoParam || p.nombre === productoParam);
-    if (!prod) return;
-    didHighlight.current = true;
-    if (prod.categoria && prod.categoria !== 'Todos') setCat(prod.categoria);
-
-    requestAnimationFrame(() => {
-      const el = cardRefs.current[prod.nombre];
-      if (!el) return;
-      const navH = 80;
-      const top = el.getBoundingClientRect().top + window.scrollY - navH - 16;
-      window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
-      setHighlighted(prod.nombre);
-      el.focus({ preventScroll: true });
-      setTimeout(() => setHighlighted(null), 1500);
-    });
-  }, [productoParam, cargando, catalogo]);
 
   useEffect(() => {
     if (!sheet) return undefined;
@@ -231,7 +454,6 @@ export default function Catalogo() {
     return arr;
   }, [catalogo, cat, q, orden]);
 
-  // Items del carrito: pasos × venta_por = cantidad real; subtotal = precio × cantidad real.
   const items = catalogo
     .filter((p) => qty[p.nombre] > 0)
     .map((p) => {
@@ -240,6 +462,10 @@ export default function Catalogo() {
       return { ...p, pasos, subtotal: p.precio * pasos * vp };
     });
   const total = items.reduce((acc, it) => acc + it.subtotal, 0);
+
+  const waFooter = site.whatsapp
+    ? `https://wa.me/${site.whatsapp}`
+    : `https://wa.me/?text=${encodeURIComponent('¡Hola, Portal Natural!')}`;
 
   return (
     <div className="pn-page pn-catalog-page">
@@ -309,8 +535,6 @@ export default function Catalogo() {
                   i={i}
                   pasos={qty[p.nombre] || 0}
                   onSumar={sumar}
-                  highlighted={highlighted === p.nombre}
-                  cardRef={(el) => { cardRefs.current[p.nombre] = el; }}
                 />
               ))}
             </div>
@@ -323,7 +547,13 @@ export default function Catalogo() {
           </div>
 
           <aside className="pn-cart" aria-label="Tu pedido">
-            <Pedido items={items} total={total} onQuitar={quitar} />
+            <Pedido
+              items={items}
+              total={total}
+              catalogo={catalogo}
+              onQuitar={quitar}
+              onHacerPedido={() => setModal(true)}
+            />
           </aside>
         </section>
       </main>
@@ -331,7 +561,13 @@ export default function Catalogo() {
       <footer className="pn-cat-footer">
         <div className="pn-cat-footer-copy">
           <span className="pn-cat-footer-title">¿No encontrás lo que buscabas?</span>
-          <p>Escribinos a {site.telefono.replace(/^\[T/, '[t')} y lo conseguimos para tu próxima visita.</p>
+          <p>
+            Escribinos a{' '}
+            <a href={waFooter} target="_blank" rel="noopener noreferrer">
+              {site.telefono}
+            </a>
+            {' '}y lo conseguimos para tu próxima visita.
+          </p>
         </div>
         <Link className="pn-btn pn-btn-primary pn-btn-lg" to="/#contacto">Ir a contacto</Link>
       </footer>
@@ -346,9 +582,26 @@ export default function Catalogo() {
       {sheet && (
         <div className="pn-sheet-backdrop" onMouseDown={(e) => e.target === e.currentTarget && setSheet(false)}>
           <div className="pn-sheet pn-cart" role="dialog" aria-modal="true" aria-label="Tu pedido">
-            <Pedido items={items} total={total} onQuitar={quitar} onClose={() => setSheet(false)} />
+            <Pedido
+              items={items}
+              total={total}
+              catalogo={catalogo}
+              onQuitar={quitar}
+              onClose={() => setSheet(false)}
+              onHacerPedido={() => { setSheet(false); setModal(true); }}
+            />
           </div>
         </div>
+      )}
+
+      {modal && (
+        <ConfirmarPedido
+          items={items}
+          total={total}
+          catalogo={catalogo}
+          onClose={() => setModal(false)}
+          onConfirmado={() => { vaciar(); setModal(false); setSheet(false); }}
+        />
       )}
     </div>
   );
