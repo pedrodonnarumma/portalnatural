@@ -140,6 +140,73 @@ En resumen, los cambios que aplica:
 - `src/data/site.js` y `src/data/products.js`: datos públicos (dirección, horarios, WhatsApp, catálogo con precios y favoritos de la landing).
 - `src/lib/pedido.js`: pedido del catálogo y funciones de mensaje WhatsApp. El número va en `site.whatsapp`. `src/lib/precios.js`: cálculo de precios por fracción.
 
+## Verificación post-migración SQL (Fase 1A)
+
+Después de ejecutar el bloque Fase 1A en el SQL Editor, corrés estos `curl` con la **anon key** para confirmar que la seguridad quedó como se espera. Reemplazá `<ANON_KEY>` con el valor de `VITE_SUPABASE_ANON_KEY`.
+
+```bash
+SB="https://ihtdpnrmphzmnipfxwkp.supabase.co"
+KEY="<ANON_KEY>"
+```
+
+### 1. `productos` directo — anon ve productos activos (hasta que corra Fase 1B)
+
+```bash
+curl -s "$SB/rest/v1/productos?activo=eq.true&select=nombre,precio,costo,stock&limit=1" \
+  -H "apikey: $KEY" -H "Authorization: Bearer $KEY" | python3 -m json.tool
+```
+
+**Resultado esperado:** un array con un producto. Los campos `costo` y `stock` todavía son visibles (se eliminan en Fase 1B). Después de Fase 1B, devuelve `[]`.
+
+### 2. `precios_promo_vigentes` — anon debe recibir 401 / error de permisos
+
+```bash
+curl -s "$SB/rest/v1/precios_promo_vigentes?select=*&limit=1" \
+  -H "apikey: $KEY" -H "Authorization: Bearer $KEY" | python3 -m json.tool
+```
+
+**Resultado esperado:** `{"code":"42501","message":"permission denied for view precios_promo_vigentes"}` (o similar). Si devuelve datos, el `revoke` no se aplicó.
+
+### 3. `catalogo_publico` — anon ve productos con precio lista + precio_promo
+
+```bash
+curl -s "$SB/rest/v1/catalogo_publico?select=nombre,precio,precio_promo,unidad&order=nombre&limit=3" \
+  -H "apikey: $KEY" -H "Authorization: Bearer $KEY" | python3 -m json.tool
+```
+
+**Resultado esperado:** array de productos. `precio` es el precio de lista. `precio_promo` es el precio promo o `null` si no hay. Ningún campo `costo` ni `stock` visible.
+
+```json
+[
+  { "nombre": "Almendras", "precio": 12000, "precio_promo": null, "unidad": "kg" },
+  { "nombre": "Nueces",    "precio": 15000, "precio_promo": 12000, "unidad": "kg" }
+]
+```
+
+### 4. `resumen_ventas` — anon debe recibir error de permisos
+
+```bash
+curl -s "$SB/rest/v1/rpc/resumen_ventas" \
+  -X POST -H "Content-Type: application/json" \
+  -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
+  -d '{"desde":"2025-01-01T00:00:00Z","hasta":"2025-12-31T23:59:59Z"}' | python3 -m json.tool
+```
+
+**Resultado esperado:** `{"code":"42501","message":"permission denied for function resumen_ventas"}`. Si devuelve datos, el `revoke` de la función no se aplicó.
+
+### 5. `crear_pedido_web` — anon puede llamarla (es la única RPC pública)
+
+```bash
+curl -s "$SB/rest/v1/rpc/crear_pedido_web" \
+  -X POST -H "Content-Type: application/json" \
+  -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
+  -d '{"p_nombre":"Test","p_telefono":"2615000000","p_items":[]}' | python3 -m json.tool
+```
+
+**Resultado esperado:** `{"code":"P0001","message":"El pedido no tiene ítems"}`. El error de validación confirma que la función es accesible para anon (si fuera 401 hay un problema con el grant).
+
+---
+
 ## Pendiente del cliente
 
 - Cargar foto del local en `public/` y poner su ruta en `fotos.local` de `src/data/site.js`.

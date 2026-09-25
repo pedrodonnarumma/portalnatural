@@ -46,6 +46,7 @@ export default function Favorites() {
           const tono = p.tono ?? TONOS[i % 2];
           const tonoMovil = p.tonoMovil ?? null;
           const destino = '/catalogo';
+          const efectivo = p.precio_promo ?? p.precio;
 
           return (
             <Link
@@ -60,7 +61,10 @@ export default function Favorites() {
                   : <ProductIcon name={p.icono ?? 'hoja'} className="pn-thumb-icon" />}
               </div>
               <div className="pn-fav-body">
-                <span className="pn-card-cat pn-d">{p.categoria}</span>
+                <div className="pn-card-cat-row pn-d">
+                  <span className="pn-card-cat">{p.categoria}</span>
+                  {p.precio_promo != null && <span className="pn-promo-badge">Promo</span>}
+                </div>
                 <h3 className="pn-card-name">
                   {p.nombreCorto
                     ? <><span className="pn-d">{p.nombre}</span><span className="pn-m">{p.nombreCorto}</span></>
@@ -69,16 +73,19 @@ export default function Favorites() {
                 {(p.detalle || p.descripcion) && (
                   <p className="pn-card-desc pn-d">{p.detalle ?? p.descripcion}</p>
                 )}
-                {showPrices && p.precio != null ? (
+                {showPrices && efectivo != null ? (
                   <div className="pn-fav-price">
-                    <span className="pn-price">{fmtPrecio(precioPresentacion(p.precio, vp))}</span>
+                    {p.precio_promo != null && (
+                      <span className="pn-price-lista">{fmtPrecio(precioPresentacion(p.precio, vp))}</span>
+                    )}
+                    <span className="pn-price">{fmtPrecio(precioPresentacion(efectivo, vp))}</span>
                     <span className="pn-unit">/ {etiquetaPresentacion(unidad, vp)}</span>
                   </div>
                 ) : (
                   <span className="pn-price">{showPrices ? 'Consultá el precio' : 'Consultá el precio'}</span>
                 )}
-                {showPrices && precioReferencia(p.precio, unidad, vp) && (
-                  <span className="pn-price-ref">{precioReferencia(p.precio, unidad, vp)}</span>
+                {showPrices && precioReferencia(efectivo, unidad, vp) && (
+                  <span className="pn-price-ref">{precioReferencia(efectivo, unidad, vp)}</span>
                 )}
               </div>
             </Link>

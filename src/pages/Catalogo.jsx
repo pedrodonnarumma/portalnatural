@@ -29,9 +29,10 @@ function registrarPopular(nombre) {
 
 function ProductCard({ p, i, pasos, onSumar }) {
   const vp = p.venta_por ?? 1;
-  const precioPublico = precioPresentacion(p.precio, vp);
+  const efectivo = p.precio_promo ?? p.precio;   // precio que paga el cliente
+  const precioPublico = precioPresentacion(efectivo, vp);
   const etiqUnidad = etiquetaPresentacion(p.unidad, vp);
-  const ref = precioReferencia(p.precio, p.unidad, vp);
+  const ref = precioReferencia(efectivo, p.unidad, vp);
 
   return (
     <article className="pn-card pn-product">
@@ -41,12 +42,18 @@ function ProductCard({ p, i, pasos, onSumar }) {
           : <ProductIcon name={p.icono ?? 'hoja'} className="pn-thumb-icon" />}
       </div>
       <div className="pn-product-body">
-        <span className="pn-card-cat">{p.categoria}</span>
+        <div className="pn-card-cat-row">
+          <span className="pn-card-cat">{p.categoria}</span>
+          {p.precio_promo != null && <span className="pn-promo-badge">Promo</span>}
+        </div>
         <h3 className="pn-card-name">{p.nombre}</h3>
         {p.descripcion && <p className="pn-card-desc">{p.descripcion}</p>}
         <div className="pn-product-price">
           {showPrices ? (
             <>
+              {p.precio_promo != null && (
+                <span className="pn-price-lista">{fmtPrecio(precioPresentacion(p.precio, vp))}</span>
+              )}
               <span className="pn-price">{fmtPrecio(precioPublico)}</span>
               <span className="pn-unit">/ {etiqUnidad}</span>
             </>
@@ -327,13 +334,14 @@ function Pedido({ items, total, catalogo, onQuitar, onClose, onHacerPedido }) {
             {items.map((it) => {
               const vp = it.venta_por ?? 1;
               const cantLabel = etiquetaCantidad(it.pasos, it.unidad, vp);
-              const precLabel = `${fmtPrecio(precioPresentacion(it.precio, vp))} / ${etiquetaPresentacion(it.unidad, vp)}`;
+              const precLabel = `${fmtPrecio(precioPresentacion(it.efectivo, vp))} / ${etiquetaPresentacion(it.unidad, vp)}`;
               return (
                 <li key={it.nombre} className="pn-cart-row">
                   <div className="pn-cart-row-text">
                     <span className="pn-cart-row-name">{it.nombre}</span>
                     <span className="pn-cart-row-detail">
                       {it.unidad === 'un' ? cantLabel : `${cantLabel} · ${precLabel}`}
+                      {it.precio_promo != null && <span className="pn-promo-badge pn-promo-badge-sm">Promo</span>}
                     </span>
                   </div>
                   <span className="pn-cart-row-sub">{fmtPrecio(it.subtotal)}</span>
@@ -459,7 +467,8 @@ export default function Catalogo() {
     .map((p) => {
       const pasos = qty[p.nombre];
       const vp = p.venta_por ?? 1;
-      return { ...p, pasos, subtotal: p.precio * pasos * vp };
+      const efectivo = p.precio_promo ?? p.precio;
+      return { ...p, pasos, efectivo, subtotal: efectivo * pasos * vp };
     });
   const total = items.reduce((acc, it) => acc + it.subtotal, 0);
 

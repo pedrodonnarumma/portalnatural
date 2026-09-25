@@ -593,7 +593,9 @@ grant select on public.precios_promo_vigentes to authenticated;
 
 -- 2. Vista pública del catálogo: reemplaza acceso directo anon a productos.
 --    Corre como owner (security_invoker=false, default PostgreSQL) → no expone
---    costo ni stock. El precio ya incorpora la promo vigente.
+--    costo ni stock.
+--    precio      = precio de lista (siempre el precio base del producto)
+--    precio_promo = precio promocional vigente, NULL si no hay promo activa
 create or replace view public.catalogo_publico as
   select
     p.id,
@@ -605,9 +607,8 @@ create or replace view public.catalogo_publico as
     p.imagen_url,
     p.descripcion,
     p.destacado,
-    coalesce(ppv.precio_promo, p.precio) as precio,
-    p.precio                             as precio_lista,
-    ppv.precio_promo is not null         as en_promo
+    p.precio              as precio,       -- precio de lista (siempre)
+    ppv.precio_promo      as precio_promo  -- precio promo, NULL si no hay
   from public.productos p
   left join public.precios_promo_vigentes ppv on ppv.producto_id = p.id
   where p.activo = true;

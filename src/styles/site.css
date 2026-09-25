@@ -147,9 +147,13 @@ section[id] { scroll-margin-top: 92px; }
 .pn-tone-tint { background: var(--pn-tint); }
 .pn-tone-tint-2 { background: var(--pn-tint-2); }
 .pn-card-cat { font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--pn-subtle); }
+.pn-card-cat-row { display: flex; align-items: center; gap: 8px; }
 .pn-card-name { margin: 0; font-family: var(--font-display); font-size: 20px; font-weight: 600; color: var(--pn-ink); line-height: normal; }
 .pn-card-desc { margin: 0; font-size: 14px; line-height: 1.55; color: var(--pn-muted); }
 .pn-price { font-size: 17px; font-weight: 700; color: var(--pn-accent); }
+.pn-price-lista { font-size: 13px; font-weight: 500; color: var(--pn-subtle); text-decoration: line-through; }
+.pn-promo-badge { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; background: #d4f5e2; color: #1a6640; border-radius: 4px; padding: 1px 6px; }
+.pn-promo-badge-sm { font-size: 10px; padding: 0 5px; }
 
 /* ═════════ Favoritos (landing) ═════════ */
 .pn-favs {
