@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, Trash2, Ban, Eye, Check, X } from 'lucide-react';
+import { Plus, Trash2, Ban, Eye, Check, X, FileDown } from 'lucide-react';
 import { supabase } from '../../lib/supabase.js';
 import { fmtDate, fmtMoney, fmtQty, MEDIOS_PAGO, medioPagoLabel, startOfDayISO, toDateInput } from '../lib/format.js';
 import { etiquetaPresentacion, precioPresentacion } from '../../lib/precios.js';
 import { Confirm, EmptyState, ErrorBox, Field, Modal, PageHead, SearchBox, Spinner, useToast } from '../components/ui.jsx';
+import { useAuth } from '../AuthProvider.jsx';
+import ExcelModal from '../components/ExcelModal.jsx';
 
 const RANGOS = [
   { key: 'hoy', label: 'Hoy' },
@@ -33,7 +35,17 @@ function origenTag(origen) {
   return <span className="tag tag-neutral">Local</span>;
 }
 
+/* Devuelve [desdeStr, hastaStr] correspondiente al rango activo. */
+function rangeStrings(rango) {
+  const hoy = toDateInput(new Date());
+  if (rango === 'hoy') return [hoy, hoy];
+  if (rango === '7')   { const d = new Date(); d.setDate(d.getDate() - 6); return [toDateInput(d), hoy]; }
+  if (rango === '30')  { const d = new Date(); d.setDate(d.getDate() - 29); return [toDateInput(d), hoy]; }
+  return [toDateInput(new Date(new Date().getFullYear(), 0, 1)), hoy]; // este año
+}
+
 export default function Ventas() {
+  const { session } = useAuth();
   const toast = useToast();
   const [rows, setRows] = useState(null);
   const [pendientes, setPendientes] = useState(null);
@@ -43,6 +55,7 @@ export default function Ventas() {
   const [viewing, setViewing] = useState(null);
   const [cancelling, setCancelling] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [exportando, setExportando] = useState(false);
 
   const loadPendientes = useCallback(async () => {
     const { data, error: err } = await supabase
@@ -127,6 +140,9 @@ export default function Ventas() {
             </button>
           ))}
         </div>
+        <button type="button" className="btn btn-secondary btn-sm" style={{ marginLeft: 'auto' }} onClick={() => setExportando(true)}>
+          <FileDown size={14} /> Exportar Excel
+        </button>
       </div>
 
       <ErrorBox error={error} />
@@ -200,6 +216,18 @@ export default function Ventas() {
           onClose={() => setCancelling(null)}
         />
       )}
+      {exportando && (() => {
+        const [desdeStr, hastaStr] = rangeStrings(rango);
+        return (
+          <ExcelModal
+            contexto="ventas"
+            desdeInicial={desdeStr}
+            hastaInicial={hastaStr}
+            userEmail={session?.user?.email}
+            onClose={() => setExportando(false)}
+          />
+        );
+      })()}
     </>
   );
 }

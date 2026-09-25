@@ -203,6 +203,26 @@
 .image-upload-controls .input { flex: 1; }
 .image-preview-sm { width: 80px; height: 60px; object-fit: cover; border-radius: var(--radius-md); border: 1px solid var(--color-divider); }
 
+/* — Excel modal — */
+.xm-body { display: flex; flex-direction: column; gap: 16px; }
+.xm-section { display: flex; flex-direction: column; gap: 8px; }
+.xm-section-tall { grid-column: 1 / -1; }
+.xm-label { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-60); display: flex; align-items: center; gap: 8px; }
+.xm-clear { font-size: 12px; font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--color-accent); background: none; border: 0; cursor: pointer; padding: 0; }
+.xm-clear:hover { text-decoration: underline; }
+.xm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.xm-chips { flex-wrap: wrap; }
+.xm-checks { display: flex; flex-direction: column; gap: 6px; }
+.xm-checks-wrap { flex-direction: row; flex-wrap: wrap; gap: 6px 16px; }
+.xm-checks-scroll { max-height: 160px; overflow-y: auto; border: 1px solid var(--color-divider); border-radius: var(--radius-md); padding: 8px 10px; gap: 6px; }
+.xm-cliente-search { position: relative; }
+.xm-cliente-drop { position: absolute; top: 100%; left: 0; right: 0; z-index: 20; background: var(--color-surface); border: 1px solid var(--color-divider); border-radius: var(--radius-md); box-shadow: var(--shadow-md); overflow: hidden; }
+.xm-cliente-opt { display: block; width: 100%; text-align: left; padding: 8px 12px; font: inherit; font-size: 14px; background: none; border: 0; cursor: pointer; }
+.xm-cliente-opt:hover { background: var(--color-neutral-100); }
+.xm-cliente-sel { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.xm-preview { padding: 12px 14px; background: var(--color-neutral-100); border-radius: var(--radius-md); font-size: 14px; min-height: 42px; display: flex; align-items: center; }
+.xm-preview-zero { color: var(--text-60); }
+
 /* — móvil — */
 @media (max-width: 860px) {
   .sidebar { position: fixed; z-index: 60; left: 0; transform: translateX(-100%); transition: transform 0.2s ease; box-shadow: var(--shadow-lg); }
