@@ -602,6 +602,7 @@ create or replace view public.catalogo_publico as
     p.nombre,
     p.categoria,
     p.categoria_id,
+    c.orden               as categoria_orden,
     p.unidad,
     p.venta_por,
     p.imagen_url,
@@ -611,6 +612,7 @@ create or replace view public.catalogo_publico as
     ppv.precio_promo      as precio_promo  -- precio promo, NULL si no hay
   from public.productos p
   left join public.precios_promo_vigentes ppv on ppv.producto_id = p.id
+  left join public.categorias c on c.id = p.categoria_id
   where p.activo = true;
 
 -- Acceso público a la vista del catálogo (anon y authenticated)
@@ -634,6 +636,11 @@ drop trigger if exists sync_categoria_nombre_trg on public.categorias;
 create trigger sync_categoria_nombre_trg
   after update or delete on public.categorias
   for each row execute function public.sync_categoria_nombre();
+
+-- Sincronización inicial: pone en línea los productos que ya existían con nombre desincronizado
+update public.productos p set categoria = c.nombre
+from public.categorias c
+where p.categoria_id = c.id and p.categoria is distinct from c.nombre;
 
 -- 4. Snapshot histórico del costo unitario en venta_items
 alter table public.venta_items add column if not exists costo_unitario numeric(12,2);
@@ -848,7 +855,7 @@ create or replace function public.top_productos(
 ) returns table(nombre text, unidad text, cantidad numeric, total numeric)
 language sql security invoker stable as $$
   select
-    vi.nombre,
+    coalesce(p.nombre, vi.nombre) as nombre,
     p.unidad,
     sum(vi.cantidad)  as cantidad,
     sum(vi.subtotal)  as total
@@ -857,7 +864,7 @@ language sql security invoker stable as $$
   left join public.productos p on p.id = vi.producto_id
   where v.estado = 'pagada'
     and v.fecha >= desde and v.fecha <= hasta
-  group by vi.nombre, p.unidad
+  group by coalesce(vi.producto_id::text, vi.nombre), coalesce(p.nombre, vi.nombre), p.unidad
   order by sum(vi.subtotal) desc
   limit limite;
 $$;

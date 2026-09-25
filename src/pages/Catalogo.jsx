@@ -13,6 +13,8 @@ import {
 
 const SB_URL = import.meta.env.VITE_SUPABASE_URL;
 const SB_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const IS_DEV = import.meta.env.DEV;
+const useSB = Boolean(SB_URL && SB_KEY);
 const KEY_POPULAR = 'pn-popular';
 const TONOS = ['tint-2', 'tint'];
 
@@ -397,8 +399,10 @@ export default function Catalogo() {
   const [orden, setOrden] = useState('');
   const [sheet, setSheet] = useState(false);
   const [modal, setModal] = useState(false);
-  const [catalogo, setCatalogo] = useState(catalogoStatic);
-  const [cargando, setCargando] = useState(Boolean(SB_URL && SB_KEY));
+  const [catalogo, setCatalogo] = useState(IS_DEV || !useSB ? catalogoStatic : []);
+  const [cargando, setCargando] = useState(useSB);
+  const [error, setError] = useState(false);
+  const [retry, setRetry] = useState(0);
   const { qty, sumar: sumarBase, quitar, vaciar } = usePedido();
 
   const sumar = useCallback((nombre, delta) => {
@@ -415,16 +419,27 @@ export default function Catalogo() {
   }, []);
 
   useEffect(() => {
-    if (!SB_URL || !SB_KEY) return;
+    if (!useSB) return;
+    setCargando(true);
+    setError(false);
     fetch(
-      `${SB_URL}/rest/v1/catalogo_publico?select=id,nombre,categoria,precio,precio_lista,en_promo,unidad,venta_por,imagen_url,descripcion,destacado&order=nombre`,
+      `${SB_URL}/rest/v1/catalogo_publico?select=id,nombre,categoria,categoria_orden,precio,precio_promo,unidad,venta_por,imagen_url,descripcion,destacado&order=nombre`,
       { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } },
     )
-      .then((r) => r.json())
-      .then((data) => { if (Array.isArray(data) && data.length > 0) setCatalogo(data); })
-      .catch(() => {})
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) setCatalogo(data);
+        else if (!IS_DEV) setError(true);
+      })
+      .catch((err) => {
+        console.error('[Portal Natural] Error cargando catálogo:', err);
+        if (!IS_DEV) setError(true);
+      })
       .finally(() => setCargando(false));
-  }, []);
+  }, [retry]);
 
   useEffect(() => {
     if (!sheet) return undefined;
@@ -438,7 +453,14 @@ export default function Catalogo() {
   }, [sheet]);
 
   const categorias = useMemo(() => {
-    const cats = [...new Set(catalogo.map((p) => p.categoria).filter(Boolean))].sort();
+    const ordenMap = {};
+    catalogo.forEach((p) => {
+      if (p.categoria && !(p.categoria in ordenMap)) {
+        ordenMap[p.categoria] = p.categoria_orden ?? 9999;
+      }
+    });
+    const cats = [...new Set(catalogo.map((p) => p.categoria).filter(Boolean))]
+      .sort((a, b) => ordenMap[a] - ordenMap[b] || a.localeCompare(b));
     return ['Todos', ...cats];
   }, [catalogo]);
 
@@ -452,7 +474,7 @@ export default function Catalogo() {
       (p) => (cat === 'Todos' || p.categoria === cat) && (!nq || normalizar(`${p.nombre} ${p.categoria} ${p.descripcion}`).includes(nq)),
     );
     if (orden === 'precio') {
-      arr = [...arr].sort((a, b) => precioPresentacion(a.precio, a.venta_por) - precioPresentacion(b.precio, b.venta_por));
+      arr = [...arr].sort((a, b) => precioPresentacion(a.precio_promo ?? a.precio, a.venta_por) - precioPresentacion(b.precio_promo ?? b.precio, b.venta_por));
     } else if (orden === 'popular') {
       const pop = leerPopular();
       arr = [...arr].sort((a, b) => (pop[b.nombre] || 0) - (pop[a.nombre] || 0));
@@ -547,7 +569,15 @@ export default function Catalogo() {
                 />
               ))}
             </div>
-            {!cargando && lista.length === 0 && (
+            {!cargando && error && (
+              <div className="pn-cat-error">
+                <p>No pudimos cargar el catálogo. Probá de nuevo en un rato.</p>
+                <button type="button" className="pn-btn pn-btn-ghost pn-btn-md" onClick={() => setRetry((n) => n + 1)}>
+                  Reintentar
+                </button>
+              </div>
+            )}
+            {!cargando && !error && lista.length === 0 && (
               <div className="pn-empty">
                 <span className="pn-empty-title">No encontramos ese producto</span>
                 <span>Probá con otra palabra o consultanos por mensaje.</span>

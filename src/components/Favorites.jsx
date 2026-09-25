@@ -8,6 +8,7 @@ import { etiquetaPresentacion, precioPresentacion, precioReferencia } from '../l
 
 const SB_URL = import.meta.env.VITE_SUPABASE_URL;
 const SB_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const IS_DEV = import.meta.env.DEV;
 const TONOS = ['tint-2', 'tint'];
 
 export default function Favorites() {
@@ -16,12 +17,18 @@ export default function Favorites() {
   useEffect(() => {
     if (!SB_URL || !SB_KEY) return;
     fetch(
-      `${SB_URL}/rest/v1/catalogo_publico?destacado=eq.true&select=id,nombre,categoria,precio,unidad,venta_por,imagen_url,descripcion&order=nombre&limit=8`,
+      `${SB_URL}/rest/v1/catalogo_publico?destacado=eq.true&select=id,nombre,categoria,precio,precio_promo,unidad,venta_por,imagen_url,descripcion&order=nombre&limit=8`,
       { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } },
     )
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then((data) => { if (Array.isArray(data) && data.length > 0) setItems(data); })
-      .catch(() => {});
+      .catch((err) => {
+        console.error('[Portal Natural] Error cargando destacados:', err);
+        if (!IS_DEV) setItems([]);
+      });
   }, []);
 
   return (
