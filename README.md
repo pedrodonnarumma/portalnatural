@@ -88,9 +88,41 @@ El proyecto es estático (Vite) y funciona en cualquier hosting con soporte para
 
 Ya están incluidos `vercel.json` y `public/_redirects` para que `/admin` cargue bien al recargar la página.
 
+## Pedidos web
+
+Los clientes pueden armar un pedido desde `/catalogo` y confirmarlo sin salir del sitio. El flujo es:
+
+1. El cliente agrega productos al carrito y presiona **"Hacer pedido"**.
+2. Se abre un modal donde ingresa nombre y teléfono (se recuerdan para la próxima visita).
+3. Al confirmar, se llama a la RPC `crear_pedido_web` con la anon key. El precio lo fija siempre la base de datos: si alguien intenta manipular el precio desde el navegador, la función lo ignora.
+4. La venta queda con `estado = 'pendiente'` y `origen = 'web'`, el stock se descuenta en ese momento (el pedido reserva la mercadería).
+5. El modal muestra el número de pedido y un botón **"Enviar por WhatsApp"** para coordinar el retiro.
+6. Desde el panel (Ventas → Pendientes) el local ve el pedido, puede **marcar como pagado** (elige el medio de pago) o **cancelar** (el stock vuelve).
+
+**Estados de una venta:**
+
+| Estado | Descripción |
+|---|---|
+| `pendiente` | Pedido web confirmado, no cobrado aún |
+| `pagada` | Venta registrada y cobrada |
+| `cancelada` | Anulada (stock devuelto) |
+
+### Pasos de migración SQL
+
+Si la base de datos ya existe (hay datos en producción), correr el bloque **"MIGRACIÓN pedidos web"** al final de `supabase/schema.sql` en el SQL Editor de Supabase. El bloque es idempotente: agrega columnas con `add column if not exists`, actualiza los registros anulados existentes y recrea las funciones sin borrar datos.
+
+En resumen, los cambios que aplica:
+- Agrega columnas `estado`, `origen`, `contacto_nombre`, `contacto_telefono`, `direccion_envio`, `pagada_at`, `cancelada_at` a la tabla `ventas`.
+- Sincroniza: `update ventas set estado = 'cancelada' where anulada = true`.
+- Recrea `registrar_venta` (drop + create) para aceptar `p_estado` y `p_direccion_envio`.
+- Crea `crear_pedido_web` (SECURITY DEFINER, `grant execute to anon`).
+- Crea `marcar_venta_pagada` y `cancelar_venta`.
+- Reemplaza `anular_venta` con un alias a `cancelar_venta`.
+- Emite `notify pgrst, 'reload schema'` para que PostgREST actualice la caché.
+
 ## Cómo se usa el panel
 
-- **Ventas**: “Nueva venta” abre el buscador de productos. Se agregan al ticket tocándolos, se ajusta cantidad (admite decimales para granel) y precio si hace falta, se elige cliente (opcional) y medio de pago. Al registrar, descuenta stock. Una venta se puede anular desde su detalle y el stock vuelve.
+- **Ventas**: arriba aparecen los pedidos web **Pendientes** (sin filtro de fecha). Cada uno muestra el contacto con link a WhatsApp, el origen (Web/Local) y las acciones: ver detalle, marcar como pagado o cancelar. El listado inferior muestra el resto de ventas con tag de estado; total y cantidad cuentan solo las pagadas. “Nueva venta” permite elegir estado (Pagada/Pendiente) y dirección de envío opcional.
 - **Clientes**: alta, edición y baja. Sirve para asignar ventas y ver mejores clientes en reportes.
 - **Artículos**: la ficha de cada producto: nombre, categoría, unidad de venta, precio, costo opcional (muestra el margen), stock mínimo y si está activo. Al crear uno se puede cargar el stock inicial.
 - **Stock**: las existencias de los artículos activos, con valor del inventario a costo y a venta, cantidad con stock bajo y sin stock. Desde acá se ingresa mercadería o se ajusta el stock con motivo, se ve el historial por artículo y la pestaña “Movimientos” lista todo lo que entró y salió (ingresos, ajustes, ventas y anulaciones).
@@ -106,10 +138,10 @@ Ya están incluidos `vercel.json` y `public/_redirects` para que `/admin` cargue
 - `src/admin/`: panel. `AdminApp.jsx` (auth + rutas), `Layout.jsx`, `Login.jsx`, `pages/` (Ventas, Clientes, Artículos, Stock, Promociones, Reportes), `components/ui.jsx` (modal, toasts, campos), `lib/format.js` (formato de moneda, fechas, listas fijas).
 - `src/lib/supabase.js`: cliente de Supabase. `supabase/schema.sql`: esquema completo de la base. `supabase/functions/enviar-promocion/`: función que manda los mails. `supabase/cron.sql`: envío automático opcional.
 - `src/data/site.js` y `src/data/products.js`: datos públicos (dirección, horarios, WhatsApp, catálogo con precios y favoritos de la landing).
-- `src/lib/contact.js`: formulario de contacto. Sin `VITE_CONTACT_ENDPOINT`, el envío se simula.
+- `src/lib/pedido.js`: pedido del catálogo y funciones de mensaje WhatsApp. El número va en `site.whatsapp`. `src/lib/precios.js`: cálculo de precios por fracción.
 
 ## Pendiente del cliente
 
-- Reemplazar los placeholders entre corchetes en `src/data/site.js`.
-- Cargar las fotos en `public/` y poner sus rutas en `fotos`, o la URL de embed de Google Maps en `mapaEmbed`.
-- Cargar los precios reales en `src/data/products.js` (el catálogo público sigue siendo estático, independiente del stock del panel).
+- Cargar foto del local en `public/` y poner su ruta en `fotos.local` de `src/data/site.js`.
+- Cargar los precios reales en `src/data/products.js` (el catálogo público usa estos datos cuando Supabase no está configurado; si lo está, carga los productos desde la base).
+- Ejecutar el bloque de migración SQL en Supabase si la base ya tenía datos (ver sección "Pedidos web" arriba).
