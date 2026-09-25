@@ -326,3 +326,248 @@ begin
     execute 'create policy "productos_auth_delete" on storage.objects for delete to authenticated using (bucket_id = ''productos'')';
   end if;
 end $$;
+
+-- ═══════════════════════════════════════════════════════════
+-- MIGRACIÓN pedidos web
+-- Correr en Supabase → SQL Editor (idempotente).
+-- ═══════════════════════════════════════════════════════════
+
+-- ── a. Columnas nuevas en ventas ──────────────────────────
+
+alter table public.ventas
+  add column if not exists estado text not null default 'pagada'
+    check (estado in ('pendiente','pagada','cancelada'));
+
+alter table public.ventas
+  add column if not exists origen text not null default 'local'
+    check (origen in ('local','web'));
+
+alter table public.ventas add column if not exists contacto_nombre    text;
+alter table public.ventas add column if not exists contacto_telefono  text;
+alter table public.ventas add column if not exists direccion_envio    text;
+alter table public.ventas add column if not exists pagada_at          timestamptz;
+alter table public.ventas add column if not exists cancelada_at       timestamptz;
+
+-- Sincronizar registros existentes: anuladas → canceladas
+update public.ventas
+set estado = 'cancelada', cancelada_at = created_at
+where anulada = true and estado = 'pagada';
+
+create index if not exists ventas_estado_fecha_idx on public.ventas (estado, fecha desc);
+
+-- ── b. registrar_venta (drop y recrear para evitar ambigüedad de firma) ──
+
+drop function if exists public.registrar_venta(jsonb, uuid, text, text);
+
+create or replace function public.registrar_venta(
+  p_items           jsonb,
+  p_cliente_id      uuid    default null,
+  p_medio_pago      text    default 'efectivo',
+  p_notas           text    default null,
+  p_estado          text    default 'pagada',
+  p_direccion_envio text    default null
+) returns uuid
+language plpgsql security invoker as $$
+declare
+  v_venta_id uuid;
+  v_item     jsonb;
+  v_prod     public.productos%rowtype;
+  v_cant     numeric;
+  v_precio   numeric;
+  v_total    numeric := 0;
+begin
+  if p_items is null or jsonb_array_length(p_items) = 0 then
+    raise exception 'La venta no tiene ítems';
+  end if;
+  if p_estado not in ('pendiente','pagada','cancelada') then
+    raise exception 'Estado inválido: %', p_estado;
+  end if;
+
+  insert into public.ventas (cliente_id, medio_pago, notas, estado, origen, direccion_envio, pagada_at)
+  values (
+    p_cliente_id,
+    coalesce(p_medio_pago, 'efectivo'),
+    p_notas,
+    p_estado,
+    'local',
+    p_direccion_envio,
+    case when p_estado = 'pagada' then now() else null end
+  )
+  returning id into v_venta_id;
+
+  for v_item in select * from jsonb_array_elements(p_items) loop
+    select * into v_prod from public.productos where id = (v_item->>'producto_id')::uuid for update;
+    if not found then raise exception 'Producto inexistente'; end if;
+
+    v_cant   := (v_item->>'cantidad')::numeric;
+    v_precio := coalesce((v_item->>'precio_unitario')::numeric, v_prod.precio);
+    if v_cant is null or v_cant <= 0 then raise exception 'Cantidad inválida para %', v_prod.nombre; end if;
+
+    insert into public.venta_items (venta_id, producto_id, nombre, cantidad, precio_unitario, subtotal)
+    values (v_venta_id, v_prod.id, v_prod.nombre, v_cant, v_precio, round(v_cant * v_precio, 2));
+
+    update public.productos set stock = stock - v_cant where id = v_prod.id;
+    insert into public.movimientos_stock (producto_id, tipo, cantidad, motivo, venta_id)
+    values (v_prod.id, 'venta', -v_cant, 'Venta', v_venta_id);
+
+    v_total := v_total + round(v_cant * v_precio, 2);
+  end loop;
+
+  update public.ventas set total = v_total where id = v_venta_id;
+  return v_venta_id;
+end $$;
+
+-- ── c. crear_pedido_web ───────────────────────────────────
+-- SECURITY DEFINER: la función corre con los permisos del owner (authenticated),
+-- no del invocador (anon). Así anon no necesita INSERT en ninguna tabla.
+
+drop function if exists public.crear_pedido_web(jsonb, text, text);
+
+create or replace function public.crear_pedido_web(
+  p_items     jsonb,
+  p_nombre    text,
+  p_telefono  text
+) returns table(id uuid, numero bigint, total numeric)
+language plpgsql security definer
+set search_path = public
+as $$
+declare
+  v_venta_id   uuid;
+  v_numero     bigint;
+  v_item       jsonb;
+  v_prod       public.productos%rowtype;
+  v_cant       numeric;
+  v_total      numeric := 0;
+  v_cliente_id uuid;
+  v_tel_digits text;
+begin
+  -- Validaciones del nombre
+  if p_nombre is null or length(trim(p_nombre)) < 2 or length(trim(p_nombre)) > 80 then
+    raise exception 'El nombre debe tener entre 2 y 80 caracteres';
+  end if;
+
+  -- Validación del teléfono (8–20 dígitos)
+  v_tel_digits := regexp_replace(coalesce(p_telefono,''), '\D', '', 'g');
+  if length(v_tel_digits) < 8 or length(v_tel_digits) > 20 then
+    raise exception 'El teléfono debe tener entre 8 y 20 dígitos';
+  end if;
+
+  -- Validación de ítems
+  if p_items is null or jsonb_array_length(p_items) = 0 then
+    raise exception 'El pedido no tiene ítems';
+  end if;
+  if jsonb_array_length(p_items) > 50 then
+    raise exception 'Máximo 50 ítems por pedido';
+  end if;
+
+  -- Intentar vincular cliente existente por teléfono
+  select c.id into v_cliente_id
+  from public.clientes c
+  where regexp_replace(coalesce(c.telefono,''), '\D', '', 'g') = v_tel_digits
+  limit 1;
+
+  -- Crear la venta pendiente
+  insert into public.ventas (cliente_id, medio_pago, estado, origen, contacto_nombre, contacto_telefono)
+  values (v_cliente_id, 'efectivo', 'pendiente', 'web', trim(p_nombre), p_telefono)
+  returning ventas.id, ventas.numero into v_venta_id, v_numero;
+
+  -- Procesar ítems
+  for v_item in select * from jsonb_array_elements(p_items) loop
+    select * into v_prod
+    from public.productos
+    where productos.id = (v_item->>'producto_id')::uuid and activo = true
+    for update;
+
+    if not found then
+      raise exception 'Producto inexistente o inactivo';
+    end if;
+
+    v_cant := (v_item->>'cantidad')::numeric;
+    if v_cant is null or v_cant <= 0 then
+      raise exception 'Cantidad inválida para %', v_prod.nombre;
+    end if;
+
+    -- Validar que sea múltiplo de venta_por (tolerancia de redondeo)
+    if abs(mod(v_cant, v_prod.venta_por)) > 0.0001 then
+      raise exception 'Cantidad de % debe ser múltiplo de %', v_prod.nombre, v_prod.venta_por;
+    end if;
+
+    -- El precio SIEMPRE viene de la base, nunca del cliente
+    insert into public.venta_items (venta_id, producto_id, nombre, cantidad, precio_unitario, subtotal)
+    values (v_venta_id, v_prod.id, v_prod.nombre, v_cant, v_prod.precio, round(v_cant * v_prod.precio, 2));
+
+    update public.productos set stock = stock - v_cant where productos.id = v_prod.id;
+    insert into public.movimientos_stock (producto_id, tipo, cantidad, motivo, venta_id)
+    values (v_prod.id, 'venta', -v_cant, 'Pedido web', v_venta_id);
+
+    v_total := v_total + round(v_cant * v_prod.precio, 2);
+  end loop;
+
+  update public.ventas set total = v_total where ventas.id = v_venta_id;
+
+  return query select v_venta_id, v_numero, v_total;
+end $$;
+
+-- Permitir que anon llame a crear_pedido_web (solo esta función, sin acceso directo a tablas)
+grant execute on function public.crear_pedido_web(jsonb, text, text) to anon;
+
+-- ── d. marcar_venta_pagada ────────────────────────────────
+
+drop function if exists public.marcar_venta_pagada(uuid, text);
+
+create or replace function public.marcar_venta_pagada(
+  p_venta_id   uuid,
+  p_medio_pago text default 'efectivo'
+) returns void
+language plpgsql security invoker as $$
+begin
+  update public.ventas
+  set estado = 'pagada', medio_pago = coalesce(p_medio_pago, medio_pago), pagada_at = now()
+  where id = p_venta_id and estado = 'pendiente';
+
+  if not found then
+    raise exception 'La venta no existe o no está en estado pendiente';
+  end if;
+end $$;
+
+-- ── e. cancelar_venta (reemplaza y extiende anular_venta) ─
+
+drop function if exists public.cancelar_venta(uuid);
+
+create or replace function public.cancelar_venta(p_venta_id uuid) returns void
+language plpgsql security invoker as $$
+declare v_item record;
+begin
+  perform 1 from public.ventas
+  where id = p_venta_id and estado in ('pendiente','pagada')
+  for update;
+
+  if not found then
+    raise exception 'La venta no existe o ya está cancelada';
+  end if;
+
+  for v_item in
+    select producto_id, cantidad from public.venta_items
+    where venta_id = p_venta_id and producto_id is not null
+  loop
+    update public.productos set stock = stock + v_item.cantidad where id = v_item.producto_id;
+    insert into public.movimientos_stock (producto_id, tipo, cantidad, motivo, venta_id)
+    values (v_item.producto_id, 'anulacion', v_item.cantidad, 'Cancelación de venta', p_venta_id);
+  end loop;
+
+  update public.ventas
+  set estado = 'cancelada', anulada = true, cancelada_at = now()
+  where id = p_venta_id;
+end $$;
+
+-- anular_venta queda como alias para no romper código existente
+drop function if exists public.anular_venta(uuid);
+
+create or replace function public.anular_venta(p_venta_id uuid) returns void
+language plpgsql security invoker as $$
+begin
+  perform public.cancelar_venta(p_venta_id);
+end $$;
+
+-- Indicar a PostgREST que recargue el schema
+notify pgrst, 'reload schema';
