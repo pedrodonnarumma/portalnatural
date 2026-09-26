@@ -121,4 +121,9 @@ a:hover { color: var(--pn-ink); }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  /* Disable deck sticky and scale */
+  .pn-card-sec { position: static !important; transform: none !important; }
+  .pn-card-sec::after { opacity: 0 !important; }
+  /* Ensure all reveal targets are visible */
+  [data-reveal] { opacity: 1 !important; transform: none !important; }
 }
