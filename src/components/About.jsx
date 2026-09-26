@@ -32,7 +32,6 @@ export default function About() {
               src={fotos.cucharas}
               alt=""
               aria-hidden="true"
-              loading="lazy"
               width={170}
               height={227}
             />

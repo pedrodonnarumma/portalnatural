@@ -568,6 +568,7 @@ section[id] { scroll-margin-top: 92px; }
     flex-direction: column; align-items: stretch; gap: 16px; overflow: clip;
   }
   .pn-about-copy { display: flex; flex-direction: column; gap: 16px; }
+  .pn-about-text { display: flow-root; }
   .pn-about .pn-body { font-size: 15px; line-height: 1.65; }
   /* Cucharas flotantes en móvil con shape-outside */
   .pn-spoons-m {
