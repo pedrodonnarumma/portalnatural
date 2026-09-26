@@ -23,8 +23,8 @@ export default function Contact() {
   }
 
   return (
-    <section id="contacto" className="pn-contact">
-      <div className="pn-contact-inner">
+    <section id="contacto" className="pn-contact pn-card-sec">
+      <div className="pn-contact-inner" data-reveal>
         <div className="pn-contact-copy">
           <h2 className="pn-h2 pn-contact-title">¿Buscás algo <em>en particular</em>?</h2>
           <p className="pn-contact-text">

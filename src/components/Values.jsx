@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { BagCheck, Chat, GlutenFree, Leaf } from './icons.jsx';
 
 const values = [
@@ -8,12 +9,19 @@ const values = [
 ];
 
 export default function Values() {
+  useEffect(() => {
+    // Set real stroke length for each path/circle so CSS can animate dashoffset
+    document.querySelectorAll('.pn-draw path, .pn-draw circle').forEach((el) => {
+      try { el.style.setProperty('--len', Math.ceil(el.getTotalLength() + 2)); } catch {}
+    });
+  }, []);
+
   return (
     <section className="pn-values" aria-label="Por qué elegirnos">
       <div className="pn-values-grid">
-        {values.map(({ Icon, title, text, short }) => (
-          <div key={title} className="pn-value">
-            <Icon className="pn-value-icon" />
+        {values.map(({ Icon, title, text, short }, i) => (
+          <div key={title} className="pn-value" data-reveal style={{ '--i': i }}>
+            <Icon className="pn-value-icon pn-draw" style={{ '--i': i }} />
             <h3 className="pn-value-title">{title}</h3>
             <p className="pn-value-text">
               <span className="pn-d">{text}</span>

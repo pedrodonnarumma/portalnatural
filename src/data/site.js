@@ -20,7 +20,8 @@ export const site = {
 
 // Fotos provistas por el cliente (en /public). Vacío: se muestra el placeholder ilustrado del diseño.
 export const fotos = {
-  local: '',
+  local: '/fotos/local.webp',
+  cucharas: '/fotos/cucharas.webp',
 };
 
 // Si es false, todos los precios muestran "Consultá el precio".

@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react';
 import { Clock, MapPin, Phone } from './icons.jsx';
 import { site } from '../data/site.js';
+import { estadoLocal } from '../lib/horario.js';
 
 const COMO_LLEGAR = 'https://www.google.com/maps/dir/?api=1&destination=Azcu%C3%A9naga+22%2C+Luj%C3%A1n+de+Cuyo%2C+Mendoza';
 
@@ -42,11 +44,18 @@ function MapMobile() {
 }
 
 export default function Location() {
+  const [estado, setEstado] = useState(() => estadoLocal());
   const waLink = `https://wa.me/${site.whatsapp}`;
 
+  useEffect(() => {
+    const tick = () => setEstado(estadoLocal());
+    const id = setInterval(tick, 60_000);
+    return () => clearInterval(id);
+  }, []);
+
   return (
-    <section id="ubicacion" className="pn-location">
-      <div className="pn-map">
+    <section id="ubicacion" className="pn-location pn-card-sec">
+      <div className="pn-map" data-reveal>
         {site.mapaEmbed ? (
           <iframe
             src={site.mapaEmbed}
@@ -70,7 +79,7 @@ export default function Location() {
           Cómo llegar
         </a>
       </div>
-      <div className="pn-location-copy">
+      <div className="pn-location-copy" data-reveal style={{ '--i': 1 }}>
         <span className="pn-kicker">Ubicación</span>
         <h2 className="pn-h2">Visitanos en el <em>local</em></h2>
         <ul className="pn-info">
@@ -92,6 +101,9 @@ export default function Location() {
               <span className="pn-info-sub">
                 <span className="pn-d">{site.horarioFinde}</span>
                 <span className="pn-m">{site.horarioFindeCorto}</span>
+              </span>
+              <span className={`pn-open-status${estado.abierto ? '' : ' is-closed'}`} aria-live="polite">
+                {estado.texto} · {estado.detalle}
               </span>
             </div>
           </li>

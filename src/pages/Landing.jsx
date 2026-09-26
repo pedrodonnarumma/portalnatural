@@ -8,19 +8,42 @@ import Favorites from '../components/Favorites.jsx';
 import Location from '../components/Location.jsx';
 import Contact from '../components/Contact.jsx';
 import Footer from '../components/Footer.jsx';
+import { useScrollFx } from '../hooks/useScrollFx.js';
+import { useReveal } from '../hooks/useReveal.js';
 
 export default function Landing() {
   const { hash } = useLocation();
-  // Al llegar desde /catalogo con un ancla (/#nosotros), bajar a esa sección.
+
+  // Add pn-js to <html> before paint so CSS can set initial hidden states.
+  // Must run synchronously (not in useEffect) to avoid flash of visible then hidden.
+  if (typeof document !== 'undefined') {
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!reduced) document.documentElement.classList.add('pn-js');
+  }
+
+  useEffect(() => {
+    document.title = 'Portal Natural — Dietética de barrio';
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced) return;
+    // Two rAF frames ensure layout is complete before triggering CSS transitions
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        document.documentElement.classList.add('pn-loaded');
+      });
+    });
+    return () => {
+      document.documentElement.classList.remove('pn-js', 'pn-loaded');
+    };
+  }, []);
+
   useEffect(() => {
     if (!hash) return;
     const el = document.getElementById(hash.slice(1));
     if (el) requestAnimationFrame(() => el.scrollIntoView());
   }, [hash]);
 
-  useEffect(() => {
-    document.title = 'Portal Natural — Dietética de barrio';
-  }, []);
+  useScrollFx();
+  useReveal();
 
   return (
     <div className="pn-page">
@@ -28,10 +51,12 @@ export default function Landing() {
       <main>
         <Hero />
         <Values />
-        <About />
-        <Favorites />
-        <Location />
-        <Contact />
+        <div className="pn-deck">
+          <Favorites />
+          <About />
+          <Location />
+          <Contact />
+        </div>
       </main>
       <Footer />
     </div>
