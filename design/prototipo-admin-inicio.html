@@ -1,0 +1,434 @@
+<title>Panel Portal Natural · Inicio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Fraunces:ital,opsz,wght@0,9..144,600;1,9..144,500&display=swap">
+<style>
+/* El panel es claro, igual que el sitio: paleta única pintada explícitamente. */
+:root{
+  color-scheme: light;
+  --accent:#2f6b4a; --accent-hover:#22563b; --ink:#1e3a2b; --text:#47574d; --muted:#5c6f62; --subtle:#647569;
+  --white:#fff; --band:#f6f9f4; --tint:#eef4ea; --tint-2:#e8f0e4; --line:#e4ebe2; --line-soft:#edf2eb; --line-control:#d7e2d4;
+  --warn-bg:#fbf3e3; --warn:#8a6d1f; --danger-bg:#fbefe9; --danger:#a3442a;
+  --display:'Fraunces', Georgia, serif; --body:'DM Sans','Helvetica Neue',Arial,sans-serif;
+  --ease:cubic-bezier(.22,1,.36,1);
+}
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:#e9eee7;color:var(--text);font-family:var(--body);font-size:15px;-webkit-font-smoothing:antialiased}
+button{font:inherit;cursor:pointer}
+a{color:var(--accent);text-decoration:none}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+
+/* ─── Barra de vista ─── */
+.switch-bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+  padding:12px 20px;background:rgba(233,238,231,.92);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-bottom:1px solid #dbe3d8}
+.switch-bar p{margin:0;font-size:13px;color:var(--subtle)}
+.seg{display:inline-flex;background:#fff;border:1px solid var(--line-control);border-radius:999px;padding:3px}
+.seg button{border:0;background:transparent;padding:8px 16px;border-radius:999px;color:var(--text);font-size:14px;font-weight:500}
+.seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
+.stage{padding:24px 20px 48px;display:flex;justify-content:center}
+
+/* ─── Shell escritorio ─── */
+.desk{width:100%;max-width:1320px;min-height:860px;display:flex;background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 20px 60px rgba(30,58,43,.12)}
+.side{width:232px;flex:none;background:var(--band);border-right:1px solid var(--line);padding:20px 14px;display:flex;flex-direction:column;gap:24px}
+.brand{display:flex;align-items:center;gap:10px;padding:0 8px;font-family:var(--display);font-weight:600;font-size:17px;color:var(--ink)}
+.logo{width:34px;height:34px;border-radius:9px;background:#fff;display:grid;place-items:center;border:1px solid var(--line)}
+.side nav{display:grid;gap:4px}
+.slink{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:999px;color:var(--ink);font-size:15px}
+.slink:hover{background:rgba(30,58,43,.06);color:var(--ink)}
+.slink.on{background:var(--accent);color:#fff}
+.slink .badge{margin-left:auto}
+.badge{min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:#c9772e;color:#fff;font-size:11.5px;font-weight:700;display:inline-grid;place-items:center}
+.slink.on .badge{background:#fff;color:var(--accent)}
+.side-foot{margin-top:auto;display:grid;gap:4px;font-size:14px}
+.side-foot .who{padding:6px 14px;font-size:12px;color:var(--subtle)}
+.desk-main{flex:1;min-width:0;padding:32px 36px 40px;background:#fff}
+
+/* ─── Teléfono ─── */
+.phone{width:390px;max-width:100%;height:820px;border-radius:44px;background:#11241a;padding:12px;box-shadow:0 30px 80px rgba(30,58,43,.25)}
+.screen{position:relative;width:100%;height:100%;border-radius:34px;overflow:hidden;background:#fff;display:flex;flex-direction:column}
+.p-top{flex:none;display:flex;align-items:center;justify-content:space-between;padding:14px 18px 10px;background:#fff;border-bottom:1px solid var(--line-soft)}
+.p-top .brand{padding:0;font-size:16px}
+.icon-btn{width:40px;height:40px;border-radius:12px;border:0;background:transparent;color:var(--ink);display:grid;place-items:center;position:relative}
+.icon-btn .dot{position:absolute;top:8px;right:9px;width:8px;height:8px;border-radius:50%;background:#c9772e;border:2px solid #fff}
+.p-body{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:16px 16px 110px;background:#fff}
+.p-view[hidden]{display:none}
+.tabbar{position:absolute;left:0;right:0;bottom:0;height:78px;padding:0 6px env(safe-area-inset-bottom,0px);background:#fff;border-top:1px solid var(--line);
+  display:grid;grid-template-columns:repeat(5,1fr);align-items:end;box-shadow:0 -8px 24px rgba(30,58,43,.06)}
+.tab{height:66px;border:0;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--subtle);font-size:11.5px;position:relative}
+.tab svg{width:23px;height:23px}
+.tab[aria-current="page"]{color:var(--accent);font-weight:500}
+.tab[aria-current="page"]::before{content:"";position:absolute;top:0;width:28px;height:3px;border-radius:0 0 3px 3px;background:var(--accent)}
+.tab .badge{position:absolute;top:9px;left:calc(50% + 6px);height:18px;min-width:18px;font-size:10.5px;border:2px solid #fff}
+.fab-wrap{display:flex;flex-direction:column;align-items:center;gap:3px;height:78px;justify-content:flex-start}
+.fab{width:62px;height:62px;margin-top:-22px;border-radius:50%;border:4px solid #fff;background:var(--accent);color:#fff;display:grid;place-items:center;
+  box-shadow:0 10px 24px rgba(47,107,74,.35);transition:transform .3s var(--ease)}
+.fab:active{transform:scale(.94)}
+.fab-wrap span{font-size:11.5px;color:var(--ink);font-weight:500}
+
+/* Hojas (Más y Nueva venta) */
+.sheet-bg{position:absolute;inset:0;background:rgba(30,58,43,.35);z-index:30;display:flex;align-items:flex-end;animation:fade .25s ease}
+.sheet-bg[hidden]{display:none}
+.sheet{width:100%;max-height:86%;overflow-y:auto;background:#fff;border-radius:26px 26px 0 0;padding:10px 18px 28px;animation:up .35s var(--ease)}
+.grab{width:40px;height:4px;border-radius:4px;background:var(--line-control);margin:0 auto 14px}
+@keyframes up{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.tile{border:1px solid var(--line);background:var(--band);border-radius:18px;padding:14px 8px;display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--ink);font-size:13px;text-align:center}
+.tile svg{color:var(--accent)}
+
+/* ─── Contenido de Inicio (se adapta al ancho del contenedor) ─── */
+.inicio{container-type:inline-size}
+.hello{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:22px}
+.hello h1{margin:0;font-family:var(--display);font-weight:600;font-size:34px;letter-spacing:-.02em;color:var(--ink);line-height:1.1}
+.hello h1 em{font-style:italic;font-weight:500;color:var(--accent)}
+.hello p{margin:6px 0 0;color:var(--subtle);font-size:14px}
+.status{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 14px;border-radius:999px;background:var(--tint);color:var(--ink);font-size:13.5px}
+.status i{width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.status.closed{background:var(--warn-bg)} .status.closed i{background:#b9a27a}
+.demo{display:inline-block;margin-left:8px;font-size:11.5px;padding:2px 8px;border-radius:999px;border:1px dashed var(--line-control);color:var(--subtle);vertical-align:middle}
+
+.quick{display:flex;gap:10px;margin-bottom:24px;flex-wrap:wrap}
+.qa{display:inline-flex;align-items:center;gap:9px;height:44px;padding:0 18px;border-radius:999px;border:1px solid var(--line-control);background:#fff;color:var(--ink);font-size:14.5px;font-weight:500;
+  transition:transform .35s var(--ease),background .25s}
+.qa:hover{background:var(--tint);transform:translateY(-2px);color:var(--ink)}
+.qa.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.qa.primary:hover{background:var(--accent-hover);color:#fff}
+.qa svg{flex:none}
+
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:18px}
+.kpi{border-radius:22px;background:var(--band);border:1px solid var(--line-soft);padding:18px 20px;display:flex;flex-direction:column;gap:6px;color:inherit;transition:transform .35s var(--ease),box-shadow .35s var(--ease)}
+a.kpi:hover{transform:translateY(-3px);box-shadow:0 12px 28px rgba(30,58,43,.10);color:inherit}
+.kpi-l{font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:500;color:var(--subtle)}
+.kpi-v{font-family:var(--display);font-weight:600;font-size:30px;line-height:1.1;color:var(--ink)}
+.kpi-s{font-size:13px;color:var(--muted)}
+.up{color:var(--accent);font-weight:600}
+.kpi.warn{background:var(--warn-bg);border-color:#f1e3c4} .kpi.warn .kpi-v{color:#6e5616}
+.kpi.alert{background:var(--danger-bg);border-color:#f3d8cc} .kpi.alert .kpi-v{color:#7a2e17}
+
+.grid2{display:grid;grid-template-columns:1.25fr 1fr;gap:18px;margin-bottom:18px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.panel{border:1px solid var(--line);border-radius:24px;padding:20px 22px;background:#fff;min-width:0}
+.ph{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
+.ph h2{margin:0;font-family:var(--display);font-weight:600;font-size:19px;color:var(--ink);display:flex;align-items:center;gap:8px}
+.ph a{font-size:13.5px;font-weight:500}
+.count{font-family:var(--body);font-size:12px;font-weight:700;background:#c9772e;color:#fff;border-radius:999px;padding:2px 8px}
+
+.order{display:grid;grid-template-columns:auto 1fr auto;gap:4px 14px;align-items:center;padding:12px 0;border-top:1px solid var(--line-soft)}
+.order:first-of-type{border-top:0;padding-top:4px}
+.o-num{font-size:12px;color:var(--subtle);font-weight:500;grid-row:span 2;align-self:start;padding-top:2px;min-width:38px}
+.o-name{font-weight:500;color:var(--ink);display:flex;align-items:center;gap:8px;min-width:0}
+.o-name span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tag{font-size:11px;font-weight:500;padding:2px 8px;border-radius:999px;background:var(--tint);color:var(--accent);flex:none}
+.tag.local{background:var(--band);color:var(--muted);border:1px solid var(--line)}
+.o-meta{font-size:13px;color:var(--subtle);grid-column:2}
+.o-meta b{font-weight:500;color:#9a6a1c}
+.o-right{grid-column:3;grid-row:1;display:flex;justify-content:flex-end}
+.o-acts{grid-column:3;grid-row:2;display:flex;gap:6px;justify-content:flex-end}
+.o-total{font-weight:700;color:var(--ink)}
+.mini{height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--line-control);background:#fff;color:var(--ink);font-size:13px;display:inline-flex;align-items:center;gap:6px}
+.mini.ok{background:var(--accent);border-color:var(--accent);color:#fff}
+.mini.icon{width:32px;padding:0;justify-content:center}
+.mini:hover{filter:brightness(.97)}
+
+.week-total{display:flex;align-items:baseline;gap:10px;margin:-4px 0 12px}
+.week-total b{font-family:var(--display);font-size:26px;font-weight:600;color:var(--ink)}
+.week-total span{font-size:13px;color:var(--subtle)}
+.chart{position:relative}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.bar{fill:#b7d0b0;transition:fill .2s}
+.bar.today{fill:var(--accent)}
+.bar-hit{fill:transparent;cursor:default}
+.bar-g:hover .bar{fill:#8fb186} .bar-g:hover .bar.today{fill:var(--accent-hover)}
+.axis{font-size:11.5px;fill:var(--subtle);font-family:var(--body)}
+.grid-l{stroke:var(--line-soft);stroke-width:1}
+.tip{position:absolute;pointer-events:none;transform:translate(-50%,-100%);background:var(--ink);color:#fff;font-size:12.5px;padding:6px 10px;border-radius:10px;white-space:nowrap;opacity:0;transition:opacity .15s}
+.tip b{display:block;font-size:13.5px}
+
+.list{display:grid}
+.li{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line-soft)}
+.li:first-child{border-top:0;padding-top:2px}
+.li-main{flex:1;min-width:0}
+.li-main b{display:block;font-weight:500;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.li-main span{font-size:12.5px;color:var(--subtle)}
+.lvl{height:6px;border-radius:6px;background:var(--line-soft);overflow:hidden;margin-top:6px}
+.lvl i{display:block;height:100%;border-radius:6px;background:#c9772e}
+.rank{width:22px;height:22px;border-radius:50%;background:var(--tint);color:var(--accent);font-size:12px;font-weight:700;display:grid;place-items:center;flex:none}
+.hbar{height:6px;border-radius:6px;background:var(--tint-2);margin-top:6px;overflow:hidden}
+.hbar i{display:block;height:100%;background:var(--accent);border-radius:6px}
+.amt{font-weight:600;color:var(--ink);white-space:nowrap}
+.promo-end{font-size:12px;color:#9a6a1c;font-weight:500}
+
+/* Adaptación al ancho del contenedor (teléfono o pantallas angostas) */
+@container (max-width:900px){
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .grid2,.grid3{grid-template-columns:1fr}
+}
+@container (max-width:520px){
+  .hello{margin-bottom:14px} .hello h1{font-size:26px} .status{height:30px;font-size:12.5px}
+  .quick{flex-wrap:nowrap;overflow-x:auto;margin:0 -16px 18px;padding:2px 16px 6px;scrollbar-width:none}
+  .quick::-webkit-scrollbar{display:none}
+  .qa{flex:none;height:auto;flex-direction:column;gap:7px;width:84px;padding:12px 6px;border-radius:18px;font-size:12px;text-align:center;white-space:normal;line-height:1.2}
+  .qa svg{width:22px;height:22px}
+  .kpis{gap:10px}
+  .kpi{padding:14px;border-radius:18px} .kpi-v{font-size:23px} .kpi-l{font-size:10.5px} .kpi-s{font-size:12px}
+  .panel{padding:16px;border-radius:20px}
+  .grid2,.grid3{gap:12px;margin-bottom:12px}
+  .order{grid-template-columns:auto 1fr auto}
+  .o-right{grid-row:1;grid-column:3}
+  .o-acts{grid-column:2 / span 2;justify-content:flex-start;margin-top:6px}
+  .hide-sm{display:none}
+}
+
+/* Otras pantallas del teléfono */
+.p-h{margin:2px 0 14px;font-family:var(--display);font-weight:600;font-size:24px;color:var(--ink)}
+.pills{display:flex;gap:8px;margin-bottom:12px;overflow-x:auto}
+.pill{flex:none;height:36px;padding:0 14px;border-radius:999px;border:1px solid var(--line-control);background:#fff;color:var(--text);font-size:13.5px;font-weight:500}
+.pill.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.search{display:flex;align-items:center;gap:10px;height:44px;padding:0 14px;border-radius:14px;border:1px solid var(--line-control);color:var(--subtle);margin-bottom:12px;font-size:14px}
+.cart-line{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid var(--line-soft)}
+.stepper{display:inline-flex;align-items:center;gap:10px;background:var(--tint);border-radius:12px;padding:4px}
+.stepper button{width:30px;height:30px;border:0;border-radius:9px;background:#fff;color:var(--ink)}
+.big-btn{width:100%;height:52px;border-radius:16px;border:0;background:var(--accent);color:#fff;font-size:15.5px;font-weight:500;margin-top:14px}
+.hint{font-size:12.5px;color:var(--subtle);text-align:center;margin-top:10px}
+
+@media (max-width:760px){ .stage{padding:16px 10px 40px} .phone{height:760px;padding:8px;border-radius:40px} .screen{border-radius:32px} }
+@media (prefers-reduced-motion: reduce){ *,*::before,*::after{animation:none!important;transition:none!important} }
+</style>
+
+<div class="switch-bar">
+  <div class="seg" role="group" aria-label="Vista">
+    <button type="button" id="vDesk" aria-pressed="true">Escritorio</button>
+    <button type="button" id="vPhone" aria-pressed="false">Celular</button>
+  </div>
+  <p>Propuesta de diseño · datos de ejemplo</p>
+</div>
+
+<div class="stage">
+  <!-- ═══ ESCRITORIO ═══ -->
+  <div class="desk" id="desk">
+    <aside class="side">
+      <div class="brand"><span class="logo"><img src="data:image/webp;base64,UklGRiQEAABXRUJQVlA4IBgEAACwFQCdASpIAEgAPjEYiUOiIaEQpiggAwSymWAf04jA5UwLft9ob0gba/zAfwD+0/sB7SHqA82b+q9bB6CP6n+UB8Gf7iekHTBvxP5H5VR77+JvJDrgfkNkwv7Zoy/5Hc/F8Y8qvnm/5fmt+hf977hf8h/p/+l/MPuzeih+xhVwZtj4HX0eqn1YRZ1LjjFczkLraLxISNrgKg610uWZ6OZyPns1zjwZLSg3JFIQBsxwGUNtSns+AAD+/t17b+BS+BtDO0PTeiEvz2YA18pqAs5Wk2aUZoT5ZXwtFOXN5nKD4R9wHuYxXNApi3IVsu/3U/+INX5k9+IV8kdrkkicVMlfWzquwhBMVPm808zu4rX2JI4LNPB871HNX+2/PGcv/GnlMANlz0BYM3pEmTFm0TbY8Z2mPHM9EEG+f/48/+l9UoCYpy6cPc5EVvUOuAPon9spe0YGzfg/qOaSvqC02V/cmTXIDSWv/26KSYDYJdCAMvyB35rWwcRIxjgBiHBxy53canP565dPMIHwc/9eZMy+/9Mgv9c+HaDo6syFvsqs51XqxuD/4hb/YKcOi6qW/gRJvyZAqfYg1+gRH9/+1Ef7tcWkk1rZAeqM6HZoKq4tdeRMD1kW7Vvyqj/Y2EF1Ml35rRsf/Y6I3NIfEaEctEKV/BWza//35M6Rpfs3hX/++RLUwtvSsQq0RCBcF9yQZay1parFJFh1gZ4TmXffXmebMK3/qjHKSmilnMBnE48V8HXHREVLaxtZLkNYowxB8LoxW/HMH4Q7EAnWwNshg7j+kX5RnFOu/qkiCQ3AnMFvqM9IP4U3ZiQNZZ0TajnrETjqhmi7x6cX6xr8rpsnwdrzg3g2eWNLzC9DmBeme9fE9Q5jHpKlNOZuLMVg+IfamI7w/QX6KAk4idB5diO3fx7uCGhLyqw01swYH+Zn04p5KYQU/uZwW0WoUMc4whT1cXxReANLwbx33B8ZJDehBTVlTGmNcHtRC6L4W7XJbA+ohGhAUFiEf9K7YLRdrSlU4Pq/8GdHnivnNsfveg2d9BpSlhYgI+qTFFIjlfHNzR+D+H17XL7lrvczmSk5C0owcMSD+bYwLd5Gx4rC5NkZ74QEUspPo1sVO303zA4ktGConnWiLkReJ1f1yRxwrPhR3jdeW5i2Meb6UPkLwDVI1txMLXtQwW0A6Y1fhV5lH6U+81TOONkCol8FqAvpHi8vhVPHwtqcjQwucV5T8h8/k0w0t6vJZ2z8G/OarW9fkoUFOC283fFgEnc4ckTGj0p8viCDq27QnBkgXrEU/wzisdvyOipePpBeqW2LshdUZlg4P7///52/NKzSgB9Ca+/XAqqGU2W8PczmQJJFctjJXG/+f914wLdz9zbjkHadI/Yq+KdawAAAAAAA" alt="" width="26" height="26" style="width:26px;height:26px;object-fit:contain"></span>Portal Natural</div>
+      <nav aria-label="Secciones">
+        <a class="slink on" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg>Inicio</a>
+        <a class="slink" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.7 12.4a2 2 0 0 0 2 1.6h8.6a2 2 0 0 0 2-1.6L22 7H6"/></svg>Ventas<span class="badge">3</span></a>
+        <a class="slink" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0"/><path d="M17 4a4 4 0 0 1 0 8"/><path d="M22 21a7 7 0 0 0-4-6.3"/></svg>Clientes</a>
+        <a class="slink" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>Artículos</a>
+        <a class="slink" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Stock</a>
+        <a class="slink" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-8v18L3 13z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>Promociones</a>
+        <a class="slink" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M8 17V11"/><path d="M13 17V7"/><path d="M18 17v-4"/></svg>Reportes</a>
+      </nav>
+      <div class="side-foot">
+        <a class="slink" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14L21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>Ver sitio</a>
+        <span class="who">Sesión iniciada · Pedro</span>
+        <a class="slink" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>Salir</a>
+      </div>
+    </aside>
+    <main class="desk-main"><div class="inicio" data-inicio></div></main>
+  </div>
+
+  <!-- ═══ CELULAR ═══ -->
+  <div class="phone" id="phone" hidden>
+    <div class="screen">
+      <div class="p-top">
+        <div class="brand"><span class="logo"><img src="data:image/webp;base64,UklGRiQEAABXRUJQVlA4IBgEAACwFQCdASpIAEgAPjEYiUOiIaEQpiggAwSymWAf04jA5UwLft9ob0gba/zAfwD+0/sB7SHqA82b+q9bB6CP6n+UB8Gf7iekHTBvxP5H5VR77+JvJDrgfkNkwv7Zoy/5Hc/F8Y8qvnm/5fmt+hf977hf8h/p/+l/MPuzeih+xhVwZtj4HX0eqn1YRZ1LjjFczkLraLxISNrgKg610uWZ6OZyPns1zjwZLSg3JFIQBsxwGUNtSns+AAD+/t17b+BS+BtDO0PTeiEvz2YA18pqAs5Wk2aUZoT5ZXwtFOXN5nKD4R9wHuYxXNApi3IVsu/3U/+INX5k9+IV8kdrkkicVMlfWzquwhBMVPm808zu4rX2JI4LNPB871HNX+2/PGcv/GnlMANlz0BYM3pEmTFm0TbY8Z2mPHM9EEG+f/48/+l9UoCYpy6cPc5EVvUOuAPon9spe0YGzfg/qOaSvqC02V/cmTXIDSWv/26KSYDYJdCAMvyB35rWwcRIxjgBiHBxy53canP565dPMIHwc/9eZMy+/9Mgv9c+HaDo6syFvsqs51XqxuD/4hb/YKcOi6qW/gRJvyZAqfYg1+gRH9/+1Ef7tcWkk1rZAeqM6HZoKq4tdeRMD1kW7Vvyqj/Y2EF1Ml35rRsf/Y6I3NIfEaEctEKV/BWza//35M6Rpfs3hX/++RLUwtvSsQq0RCBcF9yQZay1parFJFh1gZ4TmXffXmebMK3/qjHKSmilnMBnE48V8HXHREVLaxtZLkNYowxB8LoxW/HMH4Q7EAnWwNshg7j+kX5RnFOu/qkiCQ3AnMFvqM9IP4U3ZiQNZZ0TajnrETjqhmi7x6cX6xr8rpsnwdrzg3g2eWNLzC9DmBeme9fE9Q5jHpKlNOZuLMVg+IfamI7w/QX6KAk4idB5diO3fx7uCGhLyqw01swYH+Zn04p5KYQU/uZwW0WoUMc4whT1cXxReANLwbx33B8ZJDehBTVlTGmNcHtRC6L4W7XJbA+ohGhAUFiEf9K7YLRdrSlU4Pq/8GdHnivnNsfveg2d9BpSlhYgI+qTFFIjlfHNzR+D+H17XL7lrvczmSk5C0owcMSD+bYwLd5Gx4rC5NkZ74QEUspPo1sVO303zA4ktGConnWiLkReJ1f1yRxwrPhR3jdeW5i2Meb6UPkLwDVI1txMLXtQwW0A6Y1fhV5lH6U+81TOONkCol8FqAvpHi8vhVPHwtqcjQwucV5T8h8/k0w0t6vJZ2z8G/OarW9fkoUFOC283fFgEnc4ckTGj0p8viCDq27QnBkgXrEU/wzisdvyOipePpBeqW2LshdUZlg4P7///52/NKzSgB9Ca+/XAqqGU2W8PczmQJJFctjJXG/+f914wLdz9zbjkHadI/Yq+KdawAAAAAAA" alt="" width="26" height="26" style="width:26px;height:26px;object-fit:contain"></span>Portal Natural</div>
+        <button class="icon-btn" type="button" aria-label="Pedidos nuevos: 3" data-go="ventas"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg><span class="dot"></span></button>
+      </div>
+      <div class="p-body" id="pbody">
+        <section class="p-view" data-view="inicio"><div class="inicio" data-inicio></div></section>
+
+        <section class="p-view" data-view="ventas" hidden>
+          <h2 class="p-h">Ventas</h2>
+          <div class="pills"><button class="pill on" type="button">Pendientes · 3</button><button class="pill" type="button">Hoy</button><button class="pill" type="button">7 días</button><button class="pill" type="button">Todas</button></div>
+          <div class="panel" data-orders></div>
+        </section>
+
+        <section class="p-view" data-view="stock" hidden>
+          <h2 class="p-h">Stock</h2>
+          <div class="search"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>Buscar artículo</div>
+          <div class="pills"><button class="pill on" type="button">Stock bajo · 5</button><button class="pill" type="button">Todos</button><button class="pill" type="button">Movimientos</button></div>
+          <div class="panel" data-stock></div>
+        </section>
+      </div>
+
+      <nav class="tabbar" aria-label="Secciones">
+        <button class="tab" type="button" data-tab="inicio" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg>Inicio</button>
+        <button class="tab" type="button" data-tab="ventas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.7 12.4a2 2 0 0 0 2 1.6h8.6a2 2 0 0 0 2-1.6L22 7H6"/></svg>Ventas<span class="badge">3</span></button>
+        <div class="fab-wrap"><button class="fab" type="button" id="fab" aria-label="Nueva venta"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg></button><span>Vender</span></div>
+        <button class="tab" type="button" data-tab="stock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Stock</button>
+        <button class="tab" type="button" data-tab="mas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></svg>Más</button>
+      </nav>
+
+      <!-- Hoja: Más -->
+      <div class="sheet-bg" id="sheetMas" hidden>
+        <div class="sheet" role="dialog" aria-modal="true" aria-label="Más secciones">
+          <div class="grab"></div>
+          <div class="tiles">
+            <a class="tile" href="#"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0"/><path d="M17 4a4 4 0 0 1 0 8"/></svg>Clientes</a>
+            <a class="tile" href="#"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/></svg>Artículos</a>
+            <a class="tile" href="#"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-8v18L3 13z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>Promociones</a>
+            <a class="tile" href="#"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M8 17V11"/><path d="M13 17V7"/><path d="M18 17v-4"/></svg>Reportes</a>
+            <a class="tile" href="#"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14L21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>Ver sitio</a>
+            <a class="tile" href="#"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>Salir</a>
+          </div>
+          <p class="hint">Sesión iniciada · Pedro</p>
+        </div>
+      </div>
+
+      <!-- Hoja: Nueva venta -->
+      <div class="sheet-bg" id="sheetVenta" hidden>
+        <div class="sheet" role="dialog" aria-modal="true" aria-label="Nueva venta">
+          <div class="grab"></div>
+          <h2 class="p-h" style="margin-top:0">Nueva venta</h2>
+          <div class="search"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>Buscar producto o código</div>
+          <div class="pills"><button class="pill" type="button">+ Almendras</button><button class="pill" type="button">+ Chía</button><button class="pill" type="button">+ Granola</button><button class="pill" type="button">+ Miel</button></div>
+          <div class="cart-line"><div><b style="color:var(--ink);font-weight:500">Almendras tostadas</b><div style="font-size:12.5px;color:var(--subtle)">$5.200 / 500 g</div></div><div class="stepper"><button type="button" aria-label="Menos">−</button><b class="num">500 g</b><button type="button" aria-label="Más">+</button></div></div>
+          <div class="cart-line"><div><b style="color:var(--ink);font-weight:500">Hierbas serranas</b><div style="font-size:12.5px;color:var(--subtle)">$2.500 / 100 g</div></div><div class="stepper"><button type="button" aria-label="Menos">−</button><b class="num">200 g</b><button type="button" aria-label="Más">+</button></div></div>
+          <div class="cart-line" style="border-top:1px solid var(--line)"><span>Total</span><b class="num" style="font-family:var(--display);font-size:24px;color:var(--ink)">$10.200</b></div>
+          <div class="pills" style="margin-top:6px"><button class="pill on" type="button">Efectivo</button><button class="pill" type="button">Transferencia</button><button class="pill" type="button">Débito</button><button class="pill" type="button">Crédito</button></div>
+          <button class="big-btn" type="button">Cobrar $10.200</button>
+          <p class="hint">También se puede guardar como pedido pendiente</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  /* ── Datos de ejemplo ── */
+  var pedidos=[
+    {n:131,nombre:'Lucía Fernández',origen:'web',items:'4 productos',total:'$18.400',hace:'hace 25 min'},
+    {n:129,nombre:'Martín Gómez',origen:'web',items:'2 productos',total:'$9.600',hace:'hace 2 h'},
+    {n:126,nombre:'Carla Sosa',origen:'local',items:'6 productos · para retirar',total:'$13.700',hace:'ayer 18.40',vieja:true}
+  ];
+  var semana=[['Dom',0],['Lun',61200],['Mar',48900],['Mié',72400],['Jue',55100],['Vie',93800],['Sáb',84300]];
+  var stock=[['Chía','0,4 kg de 2 kg mínimo',20],['Almendras tostadas','1,1 kg de 3 kg',37],['Miel pura de monte','2 unidades de 6',33],['Harina de arroz','3 kg de 5 kg',60],['Aceite de oliva','1 unidad de 4',25]];
+  var top=[['Almendras tostadas','$58.200',100],['Granola artesanal','$41.400',71],['Hierbas serranas','$32.500',56],['Proteína vegetal','$29.000',50],['Chía','$22.000',38]];
+  var ultimas=[['#135','14.12 · Efectivo','$6.300'],['#134','13.58 · Transferencia','$11.900'],['#133','13.21 · Débito','$4.500'],['#132','12.47 · Efectivo','$2.800']];
+
+  var I={
+    venta:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>',
+    compra:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>',
+    art:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12V8l-8-5-8 5v8l8 5 4-2.5"/><path d="M18 15v6"/><path d="M15 18h6"/></svg>',
+    promo:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-8v18L3 13z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>',
+    sitio:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14L21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>',
+    wa:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4L3 21l1.1-8.9A8.4 8.4 0 1 1 21 11.5z"/></svg>',
+    check:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>'
+  };
+
+  function ordersHTML(){
+    return pedidos.map(function(p){
+      return '<div class="order"><span class="o-num num">#'+p.n+'</span>'+
+        '<div class="o-name"><span>'+p.nombre+'</span><em class="tag'+(p.origen==='local'?' local':'')+'" style="font-style:normal">'+(p.origen==='web'?'Web':'Local')+'</em></div>'+
+        '<div class="o-meta">'+p.items+' · '+(p.vieja?'<b>'+p.hace+'</b>':p.hace)+'</div>'+
+        '<div class="o-right"><span class="o-total num">'+p.total+'</span></div><div class="o-acts">'+
+        (p.origen==='web'?'<button class="mini icon" type="button" aria-label="Escribir por WhatsApp">'+I.wa+'</button>':'')+
+        '<button class="mini ok" type="button">'+I.check+' Cobrado</button></div></div>';
+    }).join('');
+  }
+  function stockHTML(){
+    return stock.map(function(s){return '<div class="li"><div class="li-main"><b>'+s[0]+'</b><span>'+s[1]+'</span><div class="lvl"><i style="width:'+s[2]+'%"></i></div></div><button class="mini" type="button">Reponer</button></div>';}).join('');
+  }
+
+  function chartSVG(){
+    var W=380,H=180,pl=6,pr=6,pt=26,pb=26,max=100000,n=semana.length,step=(W-pl-pr)/n,bw=Math.min(40,step*.56);
+    var y=function(v){return pt+(H-pt-pb)*(1-v/max);};
+    var g='';
+    [0,50000,100000].forEach(function(v){g+='<line class="grid-l" x1="'+pl+'" x2="'+(W-pr)+'" y1="'+y(v)+'" y2="'+y(v)+'"/>';});
+    semana.forEach(function(d,i){
+      var x=pl+i*step+(step-bw)/2, top=y(d[1]), h=(H-pb)-top, today=i===n-1, r=Math.min(4,h/2);
+      var path=h>0?'M'+x+','+(H-pb)+'V'+(top+r)+'Q'+x+','+top+' '+(x+r)+','+top+'H'+(x+bw-r)+'Q'+(x+bw)+','+top+' '+(x+bw)+','+(top+r)+'V'+(H-pb)+'Z':'';
+      g+='<g class="bar-g" data-i="'+i+'"><rect class="bar-hit" x="'+(pl+i*step)+'" y="'+pt+'" width="'+step+'" height="'+(H-pt)+'"/>'+
+        (path?'<path class="bar'+(today?' today':'')+'" d="'+path+'"/>':'<line x1="'+x+'" x2="'+(x+bw)+'" y1="'+(H-pb)+'" y2="'+(H-pb)+'" stroke="#c8d6c3" stroke-width="2"/>')+
+        '<text class="axis" x="'+(x+bw/2)+'" y="'+(H-8)+'" text-anchor="middle"'+(today?' style="fill:#1e3a2b;font-weight:700"':'')+'>'+(today?'Hoy':d[0])+'</text>'+
+        (today?'<text class="axis" x="'+(x+bw/2)+'" y="'+(top-8)+'" text-anchor="middle" style="fill:#1e3a2b;font-weight:700">$84,3 mil</text>':'')+'</g>';
+    });
+    return '<div class="chart"><svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Ventas de los últimos 7 días. Hoy: 84.300 pesos, el mejor sábado del mes.">'+g+'</svg><div class="tip" aria-hidden="true"></div></div>';
+  }
+
+  function inicioHTML(){
+    return ''+
+    '<div class="hello"><div><h1>Buen día, <em>Pedro</em></h1><p>Así se vería un sábado a media mañana<span class="demo">datos de ejemplo</span></p></div>'+
+      '<span class="status" data-status><i></i><span>Local abierto · cierra 13.30 h</span></span></div>'+
+    '<div class="quick">'+
+      '<a class="qa primary" href="#" data-fab>'+I.venta+'Nueva venta</a>'+
+      '<a class="qa" href="#">'+I.compra+'Cargar compra</a>'+
+      '<a class="qa" href="#">'+I.art+'Nuevo artículo</a>'+
+      '<a class="qa" href="#">'+I.promo+'Nueva promo</a>'+
+      '<a class="qa" href="#">'+I.sitio+'Ver sitio</a>'+
+    '</div>'+
+    '<div class="kpis">'+
+      '<a class="kpi" href="#"><span class="kpi-l">Vendido hoy</span><span class="kpi-v num">$84.300</span><span class="kpi-s"><span class="up">▲ 12%</span> vs. sábado pasado</span></a>'+
+      '<a class="kpi" href="#"><span class="kpi-l">Ventas hoy</span><span class="kpi-v num">14</span><span class="kpi-s">Ticket promedio $6.021</span></a>'+
+      '<a class="kpi warn" href="#" data-go="ventas"><span class="kpi-l">Pedidos pendientes</span><span class="kpi-v num">3</span><span class="kpi-s">$41.700 por cobrar</span></a>'+
+      '<a class="kpi alert" href="#" data-go="stock"><span class="kpi-l">Stock bajo</span><span class="kpi-v num">5</span><span class="kpi-s">1 sin stock: Chía</span></a>'+
+    '</div>'+
+    '<div class="grid2">'+
+      '<section class="panel"><div class="ph"><h2>Pedidos pendientes <span class="count">3</span></h2><a href="#" data-go="ventas">Ver todos</a></div>'+ordersHTML()+'</section>'+
+      '<section class="panel"><div class="ph"><h2>Esta semana</h2><a href="#">Reportes</a></div>'+
+        '<div class="week-total"><b class="num">$415.700</b><span><span class="up">▲ 8%</span> vs. semana pasada</span></div>'+chartSVG()+'</section>'+
+    '</div>'+
+    '<div class="grid3">'+
+      '<section class="panel"><div class="ph"><h2>Para reponer</h2><a href="#" data-go="stock">Stock</a></div><div class="list">'+stockHTML()+'</div></section>'+
+      '<section class="panel"><div class="ph"><h2>Más vendidos</h2><span style="font-size:12.5px;color:var(--subtle)">7 días</span></div><div class="list">'+
+        top.map(function(t,i){return '<div class="li"><span class="rank">'+(i+1)+'</span><div class="li-main"><b>'+t[0]+'</b><div class="hbar"><i style="width:'+t[2]+'%"></i></div></div><span class="amt num">'+t[1]+'</span></div>';}).join('')+'</div></section>'+
+      '<section class="panel"><div class="ph"><h2>Últimas ventas</h2><a href="#">Ventas</a></div><div class="list">'+
+        ultimas.map(function(u){return '<div class="li"><div class="li-main"><b>Venta '+u[0]+'</b><span>'+u[1]+'</span></div><span class="amt num">'+u[2]+'</span></div>';}).join('')+
+        '<div class="li"><div class="li-main"><b>Promo “Semana de las semillas”</b><span class="promo-end">Termina el lunes · 6 productos</span></div><a class="mini" href="#">Ver</a></div>'+
+      '</div></section>'+
+    '</div>';
+  }
+
+  document.querySelectorAll('[data-inicio]').forEach(function(el){el.innerHTML=inicioHTML();});
+  document.querySelector('[data-orders]').innerHTML=ordersHTML();
+  document.querySelector('[data-stock]').innerHTML=stockHTML();
+
+  /* Estado del local con la hora de Mendoza */
+  try{
+    var parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/Argentina/Mendoza',weekday:'short',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(new Date());
+    var get=function(t){return (parts.find(function(p){return p.type===t;})||{}).value;};
+    var day=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].indexOf(get('weekday')),m=(+get('hour')%24)*60+(+get('minute'));
+    var H={0:[],6:[[570,810]]};for(var d=1;d<=5;d++)H[d]=[[570,810],[1020,1230]];
+    var f=function(x){var h=Math.floor(x/60),mm=x%60;return h+(mm?'.'+String(mm).padStart(2,'0'):'')+' h';};
+    var txt=null,open=false;(H[day]||[]).some(function(r){if(m>=r[0]&&m<r[1]){txt='Local abierto · cierra '+f(r[1]);open=true;return true;}if(m<r[0]){txt='Local cerrado · abre hoy '+f(r[0]);return true;}});
+    if(!txt){for(var k=1;k<=7;k++){var dd=(day+k)%7;if(H[dd].length){txt='Local cerrado · abre '+(k===1?'mañana':['el domingo','el lunes','el martes','el miércoles','el jueves','el viernes','el sábado'][dd])+' '+f(H[dd][0][0]);break;}}}
+    document.querySelectorAll('[data-status]').forEach(function(s){s.querySelector('span').textContent=txt;if(!open)s.classList.add('closed');});
+  }catch(e){}
+
+  /* Tooltip del gráfico */
+  document.querySelectorAll('.chart').forEach(function(ch){
+    var tip=ch.querySelector('.tip'),svg=ch.querySelector('svg');
+    ch.querySelectorAll('.bar-g').forEach(function(g){
+      g.addEventListener('mouseenter',function(){
+        var i=+g.dataset.i,d=semana[i],r=g.querySelector('.bar-hit').getBoundingClientRect(),c=ch.getBoundingClientRect();
+        tip.innerHTML=(i===semana.length-1?'Hoy':d[0])+'<b>'+(d[1]?'$'+d[1].toLocaleString('es-AR'):'Cerrado')+'</b>';
+        tip.style.left=(r.left-c.left+r.width/2)+'px';tip.style.top=(Math.max(0,(g.querySelector('.bar')?g.querySelector('.bar').getBoundingClientRect().top:r.bottom)-c.top)-6)+'px';tip.style.opacity=1;
+      });
+      g.addEventListener('mouseleave',function(){tip.style.opacity=0;});
+    });
+  });
+
+  /* Vista escritorio / celular */
+  var desk=document.getElementById('desk'),phone=document.getElementById('phone'),bD=document.getElementById('vDesk'),bP=document.getElementById('vPhone');
+  function view(v){desk.hidden=v!=='desk';phone.hidden=v!=='phone';bD.setAttribute('aria-pressed',v==='desk');bP.setAttribute('aria-pressed',v==='phone');}
+  bD.onclick=function(){view('desk');};bP.onclick=function(){view('phone');};
+  view(window.innerWidth<900?'phone':'desk');
+
+  /* Navegación del teléfono */
+  var pbody=document.getElementById('pbody'),mas=document.getElementById('sheetMas'),venta=document.getElementById('sheetVenta');
+  function go(name){
+    if(name==='mas'){mas.hidden=false;return;}
+    document.querySelectorAll('.p-view').forEach(function(v){v.hidden=v.dataset.view!==name;});
+    document.querySelectorAll('.tab').forEach(function(t){if(t.dataset.tab===name)t.setAttribute('aria-current','page');else t.removeAttribute('aria-current');});
+    pbody.scrollTop=0;
+  }
+  document.querySelectorAll('.tab').forEach(function(t){t.addEventListener('click',function(){go(t.dataset.tab);});});
+  phone.addEventListener('click',function(e){var g=e.target.closest('[data-go]');if(g){e.preventDefault();go(g.dataset.go);}var fb=e.target.closest('[data-fab]');if(fb){e.preventDefault();venta.hidden=false;}});
+  document.getElementById('fab').addEventListener('click',function(){venta.hidden=false;});
+  [mas,venta].forEach(function(s){s.addEventListener('click',function(e){if(e.target===s)s.hidden=true;});});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'){mas.hidden=true;venta.hidden=true;}});
+  desk.addEventListener('click',function(e){if(e.target.closest('a[href="#"]'))e.preventDefault();});
+})();
+</script>
