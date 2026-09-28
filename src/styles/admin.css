@@ -230,13 +230,25 @@
 /* — móvil ≤ 1023px — */
 @media (max-width: 1023px) {
   .sidebar { display: none; }
-  .admin-topbar { display: flex; position: sticky; top: 0; z-index: 20; }
+  /* Layout de app: el documento no scrollea, scrollea solo .admin-content */
+  .admin { height: 100vh; height: 100dvh; overflow: hidden; }
+  .admin-main { height: 100%; min-height: 0; }
+  .admin-topbar { display: flex; flex: none; }
+  .admin-content {
+    flex: 1; min-height: 0;
+    overflow-y: auto; overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 20px;
+  }
   .form-grid { grid-template-columns: 1fr; }
   .admin-backdrop { padding: 12px; }
   .col-actions .btn { width: 32px; height: 32px; }
-  .admin-content { padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
   .toasts { bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
 }
+
+/* Evita el overscroll del documento mientras el admin está montado */
+.admin-html { overscroll-behavior-y: none; }
+.admin-html body { overscroll-behavior-y: none; }
 
 /* ── Topbar bell ── */
 .admin-bell { display: flex; align-items: center; gap: 4px; margin-left: auto; color: var(--pn-accent); text-decoration: none; }
@@ -256,7 +268,8 @@
   grid-template-columns: repeat(5, 1fr); align-items: stretch;
 }
 @media (max-width: 1023px) {
-  .admin-tabbar { display: grid; }
+  /* Tabbar en flujo normal como último hijo de .admin-main: deja de depender de position: fixed */
+  .admin-tabbar { display: grid; position: static; flex: none; }
 }
 
 .admin-tab {
