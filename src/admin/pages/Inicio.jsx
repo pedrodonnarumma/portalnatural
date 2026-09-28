@@ -186,7 +186,7 @@ function SemanaChart({ data, hoy }) {
       {hover !== null && data[hover] && (
         <div
           className="i-chart-tip"
-          style={{ left: `${((pl + hover * step + step / 2) / W) * 100}%` }}
+          style={{ left: `${Math.max(15, Math.min(85, ((pl + hover * step + step / 2) / W) * 100))}%` }}
           aria-hidden="true"
         >
           <span>{labelDia(data[hover].fecha)}</span>

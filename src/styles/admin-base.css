@@ -195,6 +195,11 @@ textarea.input { min-height: 90px; resize: vertical; }
 .input { padding-inline: 14px; }
 
 
+/* En iOS, inputs < 16px disparan zoom automático al enfocarlos y el tabbar "flota" */
+@media (max-width: 1023px) {
+  .input, select.input, textarea.input { font-size: 16px; }
+}
+
 /* — piezas compartidas con la landing vieja que usa el panel — */
 .btn:hover { text-decoration: none; }
 .btn-primary, .btn-primary:hover { color: #fff; }

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { supabaseConfigured } from '../lib/supabase.js';
 import { AuthProvider, useAuth } from './AuthProvider.jsx';
@@ -51,6 +52,11 @@ function NotConfigured() {
 }
 
 export default function AdminApp() {
+  useEffect(() => {
+    document.documentElement.classList.add('admin-html');
+    return () => document.documentElement.classList.remove('admin-html');
+  }, []);
+
   if (!supabaseConfigured) return <NotConfigured />;
   return (
     <AuthProvider>

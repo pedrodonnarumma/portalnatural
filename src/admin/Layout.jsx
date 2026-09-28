@@ -1,4 +1,5 @@
-import { NavLink, Outlet, Link } from 'react-router-dom';
+import { useEffect, useRef } from 'react';
+import { NavLink, Outlet, Link, useLocation } from 'react-router-dom';
 import { Home, ShoppingCart, Users, Package, Boxes, Megaphone, BarChart3, LogOut, ExternalLink, Bell } from 'lucide-react';
 import Brand from '../components/Brand.jsx';
 import { supabase } from '../lib/supabase.js';
@@ -19,6 +20,12 @@ const NAV_LINKS = [
 export default function Layout() {
   const { session } = useAuth();
   const { count: pendientesCount } = usePendientes();
+  const contentRef = useRef(null);
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    if (contentRef.current) contentRef.current.scrollTop = 0;
+  }, [pathname]);
 
   return (
     <div className="admin">
@@ -70,7 +77,7 @@ export default function Layout() {
             </Link>
           )}
         </header>
-        <main className="admin-content">
+        <main className="admin-content" ref={contentRef}>
           <Outlet />
         </main>
         <BottomNav />
