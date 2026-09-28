@@ -2,8 +2,10 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { supabaseConfigured } from '../lib/supabase.js';
 import { AuthProvider, useAuth } from './AuthProvider.jsx';
 import { ToastProvider, Spinner } from './components/ui.jsx';
+import { PendientesProvider } from './PendientesContext.jsx';
 import Login from './Login.jsx';
 import Layout from './Layout.jsx';
+import Inicio from './pages/Inicio.jsx';
 import Ventas from './pages/Ventas.jsx';
 import Clientes from './pages/Clientes.jsx';
 import Articulos from './pages/Articulos.jsx';
@@ -18,18 +20,20 @@ function Gate() {
   if (loading) return <div className="login"><Spinner /></div>;
   if (!session) return <Login />;
   return (
-    <Routes>
-      <Route element={<Layout />}>
-        <Route index element={<Navigate to="ventas" replace />} />
-        <Route path="ventas" element={<Ventas />} />
-        <Route path="clientes" element={<Clientes />} />
-        <Route path="articulos" element={<Articulos />} />
-        <Route path="stock" element={<Stock />} />
-        <Route path="promociones" element={<Promociones />} />
-        <Route path="reportes" element={<Reportes />} />
-        <Route path="*" element={<Navigate to="ventas" replace />} />
-      </Route>
-    </Routes>
+    <PendientesProvider>
+      <Routes>
+        <Route element={<Layout />}>
+          <Route index element={<Inicio />} />
+          <Route path="ventas" element={<Ventas />} />
+          <Route path="clientes" element={<Clientes />} />
+          <Route path="articulos" element={<Articulos />} />
+          <Route path="stock" element={<Stock />} />
+          <Route path="promociones" element={<Promociones />} />
+          <Route path="reportes" element={<Reportes />} />
+          <Route path="*" element={<Navigate to="/admin" replace />} />
+        </Route>
+      </Routes>
+    </PendientesProvider>
   );
 }
 

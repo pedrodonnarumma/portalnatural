@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Plus, Pencil, Settings2, Trash2, Star } from 'lucide-react';
 import { supabase } from '../../lib/supabase.js';
 import { fmtMoney, fmtQty, UNIDADES } from '../lib/format.js';
@@ -34,6 +35,7 @@ const empty = {
 
 export default function Articulos() {
   const toast = useToast();
+  const [searchParams] = useSearchParams();
   const [rows, setRows] = useState(null);
   const [categorias, setCategorias] = useState([]);
   const [error, setError] = useState(null);
@@ -43,6 +45,10 @@ export default function Articulos() {
   const [editing, setEditing] = useState(null);
   const [managingCats, setManagingCats] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get('nuevo') === '1') setEditing({ ...empty });
+  }, []); // only on mount
 
   const destacadoCount = useMemo(() => (rows ?? []).filter((p) => p.destacado && p.activo).length, [rows]);
 

@@ -1,10 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Plus, Trash2, Ban, Eye, Check, X, FileDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from '../../lib/supabase.js';
 import { endOfDayISO, fmtDate, fmtMoney, fmtQty, MEDIOS_PAGO, medioPagoLabel, startOfDayISO, toDateInput } from '../lib/format.js';
 import { etiquetaPresentacion, precioPresentacion } from '../../lib/precios.js';
 import { Confirm, EmptyState, ErrorBox, Field, Modal, PageHead, SearchBox, Spinner, useToast } from '../components/ui.jsx';
 import { useAuth } from '../AuthProvider.jsx';
+import { usePendientes } from '../PendientesContext.jsx';
+import { marcarVentaPagada } from '../lib/ventaHelpers.js';
 import ExcelModal from '../components/ExcelModal.jsx';
 
 const RANGOS = [
@@ -57,6 +60,10 @@ function rangeStrings(rango) {
 export default function Ventas() {
   const { session } = useAuth();
   const toast = useToast();
+  const { refresh: refreshPendientes } = usePendientes();
+  const [searchParams] = useSearchParams();
+  const pendientesRef = useRef(null);
+  const scrolledRef = useRef(false);
   const [rows, setRows] = useState(null);
   const [pendientes, setPendientes] = useState(null);
   const [masPendientes, setMasPendientes] = useState(false);
@@ -126,7 +133,15 @@ export default function Ventas() {
     load();
   }, [load]);
 
-  const recargar = useCallback(() => { loadPendientes(); load(); }, [loadPendientes, load]);
+  const recargar = useCallback(() => { loadPendientes(); load(); refreshPendientes(); }, [loadPendientes, load, refreshPendientes]);
+
+  const shouldScroll = searchParams.get('estado') === 'pendiente';
+  useEffect(() => {
+    if (shouldScroll && !scrolledRef.current && pendientes?.length > 0) {
+      scrolledRef.current = true;
+      pendientesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [pendientes, shouldScroll]);
 
   async function cancelarVenta(v) {
     setBusy(true);
@@ -152,13 +167,15 @@ export default function Ventas() {
       />
 
       {/* Bloque de pendientes — siempre visible, sin filtro de fecha */}
-      <PendientesBloque
-        pendientes={pendientes}
-        masPendientes={masPendientes}
-        onVer={(v) => setViewing(v)}
-        onMarcarPagado={(v) => setViewing({ ...v, _accion: 'pagar' })}
-        onCancelar={(v) => setCancelling(v)}
-      />
+      <div ref={pendientesRef}>
+        <PendientesBloque
+          pendientes={pendientes}
+          masPendientes={masPendientes}
+          onVer={(v) => setViewing(v)}
+          onMarcarPagado={(v) => setViewing({ ...v, _accion: 'pagar' })}
+          onCancelar={(v) => setCancelling(v)}
+        />
+      </div>
 
       <div className="toolbar">
         <div className="chips chips-inline">
@@ -348,7 +365,7 @@ function PendientesBloque({ pendientes, masPendientes, onVer, onMarcarPagado, on
 }
 
 /* ── Nueva venta ── */
-function NuevaVenta({ onClose, onSaved }) {
+export function NuevaVenta({ onClose, onSaved }) {
   const toast = useToast();
   const [productos, setProductos] = useState(null);
   const [clientes, setClientes] = useState([]);
@@ -565,10 +582,7 @@ function DetalleVenta({ venta: ventaInit, onClose, onCancel, onPagada, initialAc
 
   async function marcarPagado() {
     setBusy(true);
-    const { error: err } = await supabase.rpc('marcar_venta_pagada', {
-      p_venta_id: venta.id,
-      p_medio_pago: medioPago,
-    });
+    const { error: err } = await marcarVentaPagada(venta.id, medioPago);
     setBusy(false);
     if (err) return toast(err.message, 'error');
     toast(`Venta #${venta.numero} marcada como pagada.`);

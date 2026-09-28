@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Plus, Pencil, Trash2, Send, Mail, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase.js';
 import { fmtDate, fmtMoney, startOfDayISO, toDateInput } from '../lib/format.js';
@@ -16,6 +17,7 @@ function estado(p) {
 
 export default function Promociones() {
   const toast = useToast();
+  const [searchParams] = useSearchParams();
   const [rows, setRows] = useState(null);
   const [error, setError] = useState(null);
   const [editing, setEditing] = useState(null);
@@ -23,6 +25,10 @@ export default function Promociones() {
   const [sending, setSending] = useState(null);
   const [busy, setBusy] = useState(false);
   const [clientesConMail, setClientesConMail] = useState(null);
+
+  useEffect(() => {
+    if (searchParams.get('nuevo') === '1') setEditing({});
+  }, []); // only on mount
 
   const load = useCallback(async () => {
     const [{ data, error: err }, { count }] = await Promise.all([

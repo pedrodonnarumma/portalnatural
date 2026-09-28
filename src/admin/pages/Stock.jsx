@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { PackagePlus, History, AlertTriangle } from 'lucide-react';
 import { supabase } from '../../lib/supabase.js';
 import { fmtDate, fmtMoney, fmtQty } from '../lib/format.js';
@@ -9,10 +9,11 @@ const TIPO_LABEL = { ingreso: 'Ingreso', ajuste: 'Ajuste', venta: 'Venta', anula
 
 export default function Stock() {
   const toast = useToast();
+  const [searchParams] = useSearchParams();
   const [rows, setRows] = useState(null);
   const [error, setError] = useState(null);
   const [tab, setTab] = useState('existencias'); // existencias | movimientos
-  const [q, setQ] = useState('');
+  const [q, setQ] = useState(() => searchParams.get('q') ?? '');
   const [onlyLow, setOnlyLow] = useState(false);
   const [adjusting, setAdjusting] = useState(null);
   const [history, setHistory] = useState(null);

@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react';
 import { NavLink, Outlet, Link } from 'react-router-dom';
-import { ShoppingCart, Users, Package, Boxes, Megaphone, BarChart3, LogOut, Menu, X, ExternalLink } from 'lucide-react';
+import { Home, ShoppingCart, Users, Package, Boxes, Megaphone, BarChart3, LogOut, ExternalLink, Bell } from 'lucide-react';
 import Brand from '../components/Brand.jsx';
 import { supabase } from '../lib/supabase.js';
 import { useAuth } from './AuthProvider.jsx';
+import { usePendientes } from './PendientesContext.jsx';
+import BottomNav from './components/BottomNav.jsx';
 
 const NAV_LINKS = [
+  { to: '/admin', label: 'Inicio', icon: Home, end: true },
   { to: '/admin/ventas', label: 'Ventas', icon: ShoppingCart, badge: 'pendientes' },
   { to: '/admin/clientes', label: 'Clientes', icon: Users },
   { to: '/admin/articulos', label: 'Artículos', icon: Package },
@@ -16,31 +18,24 @@ const NAV_LINKS = [
 
 export default function Layout() {
   const { session } = useAuth();
-  const [open, setOpen] = useState(false);
-  const [pendientesCount, setPendientesCount] = useState(0);
-
-  useEffect(() => {
-    supabase
-      .from('ventas')
-      .select('id', { count: 'exact', head: true })
-      .eq('estado', 'pendiente')
-      .then(({ count }) => setPendientesCount(count ?? 0));
-  }, []);
+  const { count: pendientesCount } = usePendientes();
 
   return (
     <div className="admin">
-      <aside className={`sidebar ${open ? 'is-open' : ''}`}>
+      <aside className="sidebar">
         <div className="sidebar-head">
           <Brand size="sm" as={Link} to="/admin" />
-          <button type="button" className="btn btn-icon btn-secondary sidebar-close" onClick={() => setOpen(false)} aria-label="Cerrar menú">
-            <X size={16} />
-          </button>
         </div>
         <nav className="sidebar-nav" aria-label="Secciones">
-          {NAV_LINKS.map(({ to, label, icon: Icon, badge }) => {
+          {NAV_LINKS.map(({ to, label, icon: Icon, badge, end }) => {
             const count = badge === 'pendientes' ? pendientesCount : 0;
             return (
-              <NavLink key={to} to={to} className={({ isActive }) => `sidebar-link ${isActive ? 'is-active' : ''}`} onClick={() => setOpen(false)}>
+              <NavLink
+                key={to}
+                to={to}
+                end={end}
+                className={({ isActive }) => `sidebar-link ${isActive ? 'is-active' : ''}`}
+              >
                 <Icon size={18} aria-hidden="true" />
                 <span>{label}</span>
                 {count > 0 && <span className="sidebar-badge">{count}</span>}
@@ -60,17 +55,25 @@ export default function Layout() {
           </button>
         </div>
       </aside>
-      {open && <div className="sidebar-backdrop" onClick={() => setOpen(false)} />}
+
       <div className="admin-main">
         <header className="admin-topbar">
-          <button type="button" className="btn btn-icon btn-secondary" onClick={() => setOpen(true)} aria-label="Abrir menú">
-            <Menu size={18} />
-          </button>
-          <Brand size="sm" />
+          <Brand size="sm" as={Link} to="/admin" />
+          {pendientesCount > 0 && (
+            <Link
+              to="/admin/ventas?estado=pendiente"
+              className="admin-bell"
+              aria-label={`${pendientesCount} pedidos pendientes`}
+            >
+              <Bell size={20} aria-hidden="true" />
+              <span className="admin-bell-dot" aria-hidden="true">{pendientesCount}</span>
+            </Link>
+          )}
         </header>
         <main className="admin-content">
           <Outlet />
         </main>
+        <BottomNav />
       </div>
     </div>
   );
